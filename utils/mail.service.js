@@ -16,12 +16,12 @@ const sendOtpEmail = async (email, otp) => {
     </div>
   `;
 
-  await mailer.sendMail({
-    from: `"Bihar" <${process.env.MAIL_USERNAME}>`,
-    to: email,
-    subject: "Your OTP Code",
-    html,
-  });
+await sendEmail({
+  to: email,
+  subject: "Your OTP Code",
+  html,
+});
+
 
   console.log(`📧 OTP EMAIL SENT → ${email}, OTP: ${otp}`);
 
@@ -53,12 +53,12 @@ const sendOrderStatusEmail = async ({
     </div>
   `;
 
-  await mailer.sendMail({
-    from: `"Bihar" <${process.env.MAIL_USERNAME}>`,
-    to: email,
-    subject: `Order ${status} | ${orderId}`,
-    html,
-  });
+await sendEmail({
+  to: email,
+  subject: "Your OTP Code",
+  html,
+});
+
 
   console.log(
     `📧 ORDER EMAIL SENT
@@ -80,4 +80,5 @@ module.exports = {
   sendOtpEmail,
   sendOrderStatusEmail,
 };
+
 
