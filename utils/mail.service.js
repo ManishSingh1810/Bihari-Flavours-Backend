@@ -1,4 +1,5 @@
-const mailer = require("../config/nodemailer");
+
+const { sendEmail } = require("./resend");
 
 /* ---------------- SEND OTP EMAIL ---------------- */
 const sendOtpEmail = async (email, otp) => {
@@ -79,3 +80,4 @@ module.exports = {
   sendOtpEmail,
   sendOrderStatusEmail,
 };
+
