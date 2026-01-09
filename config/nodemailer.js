@@ -12,7 +12,7 @@ const mailTransporter = nodemailer.createTransport({
   auth: {
     user: process.env.MAIL_USERNAME,
     pass: process.env.MAIL_PASSWORD
-  }
+  },
     
   tls: { rejectUnauthorized: false } // helps avoid TLS issues on some hosts
 });
@@ -27,4 +27,5 @@ mailTransporter.verify((err, success) => {
 });
 
 module.exports = mailTransporter;
+
 
