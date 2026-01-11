@@ -5,6 +5,33 @@ const express = require("express");
 const connectDB = require("./config/db");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+// Restrict CORS to allowed frontend origins
+const allowedOrigins = [
+  "https://www.bihariflavours.in",
+  "https://bihariflavours.in",
+  "https://bihari-flavours-frontend.vercel.app",
+  process.env.FRONTEND_URL, // keep env-based one too
+];
+
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like Postman, curl, server-to-server)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        console.log("Blocked by CORS:", origin);
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
 require("./config/nodemailer");
 
 // Routes
@@ -76,5 +103,13 @@ app.get("/", (req, res) => {
 // Start Server
 // --------------------
 const PORT = process.env.PORT || 5000;
+app.use((err, req, res, next) => {
+  if (err.message === "Not allowed by CORS") {
+    return res.status(403).json({ success: false, message: err.message });
+  }
+  next(err);
+});
+
 app.listen(PORT, "0.0.0.0", () => console.log(`🚀 Server running on port ${PORT}`));
+
 
