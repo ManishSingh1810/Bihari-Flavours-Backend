@@ -138,10 +138,10 @@ orderSchema.post("findOneAndUpdate", async function () {
 const Order = mongoose.model("Order", orderSchema);
 module.exports = Order;
 module.exports.orderItemSchema = orderItemSchema;
-   EXPORT MODEL
-===================== */
+ 
 const Order = mongoose.model("Order", orderSchema);
 module.exports = Order;
 module.exports.orderItemSchema = orderItemSchema;
+
 
 
