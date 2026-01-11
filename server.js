@@ -1,3 +1,4 @@
+backend server .js
 require("dotenv").config();
 // server.js
 const express = require("express");
@@ -22,9 +23,22 @@ require('./jobs/tempOrderCleanup');
 // --------------------
 // Middlewares
 // --------------------
+
+
+// Restrict CORS to the frontend origin. Uses FRONTEND_URL env if provided,
+const allowedOrigins = [process.env.FRONTEND_URL];
+
 app.use(cors({
-  origin: true,
-  credentials: true
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps, curl, or server-to-server)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS policy: This origin is not allowed'));
+    }
+  },
+  credentials: true,
 }));
 connectDB();
 app.use(cookieParser());
