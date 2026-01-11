@@ -1,4 +1,3 @@
-config/nodemailer file
 
 const nodemailer = require("nodemailer");
 
@@ -27,6 +26,7 @@ mailTransporter.verify((err) => {
 module.exports = mailTransporter;
 
 module.exports = mailTransporter;
+
 
 
 
