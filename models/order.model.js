@@ -1,4 +1,3 @@
-order.model.js file
 
 const mongoose = require("mongoose");
 const { sendOrderStatusEmail } = require("../utils/mail.service");
@@ -144,4 +143,5 @@ module.exports.orderItemSchema = orderItemSchema;
 const Order = mongoose.model("Order", orderSchema);
 module.exports = Order;
 module.exports.orderItemSchema = orderItemSchema;
+
 
