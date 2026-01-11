@@ -5,7 +5,7 @@ const express = require("express");
 const connectDB = require("./config/db");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
-require("./config/nodemailer");
+
 
 // Routes
 const otpRoutes = require("./routes/otp.routes");
@@ -96,6 +96,7 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => console.log(`🚀 Server running on port ${PORT}`));
+
 
 
 
