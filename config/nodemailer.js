@@ -1,31 +1,32 @@
+config/nodemailer file
+
 const nodemailer = require("nodemailer");
 
 /**
- * Nodemailer configuration
- * Uses Gmail SMTP with App Password
+ * Brevo SMTP using SMTP KEY (recommended)
  */
 const mailTransporter = nodemailer.createTransport({
-  host: process.env.MAIL_HOST,                 // smtp.titan.email
-  port: Number(process.env.MAIL_PORT || 587),  // 587 recommended
-  secure: String(process.env.MAIL_SECURE) === "true", // false for 587, true for 465
-  
+  host: process.env.MAIL_HOST,
+  port: process.env.MAIL_PORT,
+  secure: false, // TLS
   auth: {
-    user: process.env.MAIL_USERNAME,
-    pass: process.env.MAIL_PASSWORD
-  },
-    
-  tls: { rejectUnauthorized: false } // helps avoid TLS issues on some hosts
+   user: process.env.MAIL_USER,                    
+      pass: process.env.MAIL_PASS    
+  }
 });
 
-// Verify connection once on server start
-mailTransporter.verify((err, success) => {
+// Verify on server start
+mailTransporter.verify((err) => {
   if (err) {
-    console.error("❌ Nodemailer config failed:", err);
+    console.error("❌ Brevo SMTP config failed:", err);
   } else {
-    console.log("✅ Nodemailer configured successfully");
+    console.log("✅ Brevo SMTP configured successfully");
   }
 });
 
 module.exports = mailTransporter;
+
+module.exports = mailTransporter;
+
 
 
