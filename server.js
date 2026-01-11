@@ -5,6 +5,25 @@ const express = require("express");
 const connectDB = require("./config/db");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+require("./config/nodemailer");
+
+// Routes
+const otpRoutes = require("./routes/otp.routes");
+const userRoutes = require("./routes/user.routes");
+const productRoutes = require("./routes/product.routes");
+const cartRoutes = require("./routes/cart.routes");
+const couponRoutes = require("./routes/coupon.routes");
+const orderRoutes = require("./routes/order.routes"); 
+const {razorpayWebhook} = require("./controllers/order.controller");
+
+const app = express();
+
+// 🔥 START CRON JOBS
+require('./jobs/tempOrderCleanup');
+// --------------------
+// Middlewares
+// --------------------
+
 // Restrict CORS to allowed frontend origins
 const allowedOrigins = [
   "https://www.bihariflavours.in",
@@ -32,41 +51,7 @@ app.use(
   })
 );
 
-require("./config/nodemailer");
 
-// Routes
-const otpRoutes = require("./routes/otp.routes");
-const userRoutes = require("./routes/user.routes");
-const productRoutes = require("./routes/product.routes");
-const cartRoutes = require("./routes/cart.routes");
-const couponRoutes = require("./routes/coupon.routes");
-const orderRoutes = require("./routes/order.routes"); 
-const {razorpayWebhook} = require("./controllers/order.controller");
-
-const app = express();
-
-// 🔥 START CRON JOBS
-require('./jobs/tempOrderCleanup');
-// --------------------
-// Middlewares
-// --------------------
-
-
-// Restrict CORS to the frontend origin. Uses FRONTEND_URL env if provided,
-const allowedOrigins = [process.env.FRONTEND_URL];
-
-app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps, curl, or server-to-server)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS policy: This origin is not allowed'));
-    }
-  },
-  credentials: true,
-}));
 connectDB();
 app.use(cookieParser());
 
@@ -111,5 +96,6 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => console.log(`🚀 Server running on port ${PORT}`));
+
 
 
