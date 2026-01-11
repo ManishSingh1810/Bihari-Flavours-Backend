@@ -1,3 +1,5 @@
+order.model.js file
+
 const mongoose = require("mongoose");
 const { sendOrderStatusEmail } = require("../utils/mail.service");
 const User = require("./user.model");
@@ -28,7 +30,7 @@ const orderSchema = new mongoose.Schema(
 
     shippingAddress: {
       name: { type: String, required: true },
-      phone: { type: String }, // optional now (email-based system)
+      phone: { type: String, required: true }, 
       street: String,
       city: { type: String, required: true },
       state: { type: String, required: true },
@@ -107,7 +109,7 @@ orderSchema.pre("findOneAndUpdate", async function (next) {
 
     next();
   } catch (err) {
-    next(err);
+    next();
   }
 });
 
@@ -137,3 +139,9 @@ orderSchema.post("findOneAndUpdate", async function () {
 const Order = mongoose.model("Order", orderSchema);
 module.exports = Order;
 module.exports.orderItemSchema = orderItemSchema;
+   EXPORT MODEL
+===================== */
+const Order = mongoose.model("Order", orderSchema);
+module.exports = Order;
+module.exports.orderItemSchema = orderItemSchema;
+
