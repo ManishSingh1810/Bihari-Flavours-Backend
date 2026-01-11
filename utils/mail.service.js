@@ -1,5 +1,5 @@
 
-const { sendEmail } = require("./resend");
+const mailer = require("../config/nodemailer");
 
 /* ---------------- SEND OTP EMAIL ---------------- */
 const sendOtpEmail = async (email, otp) => {
@@ -16,12 +16,12 @@ const sendOtpEmail = async (email, otp) => {
     </div>
   `;
 
-await sendEmail({
-  to: email,
-  subject: "Your OTP Code",
-  html,
-});
-
+  await mailer.sendMail({
+    from: `"Bihar" <${process.env.MAIL_FROM}>`,
+    to: email,
+    subject: "Your OTP Code",
+    html,
+  });
 
   console.log(`📧 OTP EMAIL SENT → ${email}, OTP: ${otp}`);
 
@@ -53,12 +53,12 @@ const sendOrderStatusEmail = async ({
     </div>
   `;
 
-await sendEmail({
-  to: email,
-  subject: "Your OTP Code",
-  html,
-});
-
+  await mailer.sendMail({
+    from: `"Bihar" <${process.env.MAIL_FROM}>`,
+    to: email,
+    subject: `Order ${status} | ${orderId}`,
+    html,
+  });
 
   console.log(
     `📧 ORDER EMAIL SENT
@@ -80,5 +80,3 @@ module.exports = {
   sendOtpEmail,
   sendOrderStatusEmail,
 };
-
-
