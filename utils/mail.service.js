@@ -15,13 +15,19 @@ const sendOtpEmail = async (email, otp) => {
       <p>– Team Bihar</p>
     </div>
   `;
-await sendEmail({
+//await sendEmail({
+  //to: email,
+  //subject: "Your OTP Code",
+  //html,
+//});
+const resp = await sendEmail({
   to: email,
   subject: "Your OTP Code",
   html,
 });
 
-  console.log(`📧 OTP EMAIL SENT → ${email}, OTP: ${otp}`);
+console.log("✅ RESEND RESPONSE:", resp);
+  //console.log(`📧 OTP EMAIL SENT → ${email}, OTP: ${otp}`);
 
   return {
     success: true,
@@ -77,4 +83,5 @@ module.exports = {
   sendOtpEmail,
   sendOrderStatusEmail,
 };
+
 
