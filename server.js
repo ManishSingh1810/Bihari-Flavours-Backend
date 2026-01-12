@@ -6,6 +6,7 @@ const cookieParser = require("cookie-parser");
 const cors = require("cors");
 
 
+
 // Routes
 const otpRoutes = require("./routes/otp.routes");
 const userRoutes = require("./routes/user.routes");
@@ -29,7 +30,7 @@ const allowedOrigins = [
   "https://bihariflavours.in",
   "https://bihari-flavours-frontend.vercel.app",
   process.env.FRONTEND_URL, // keep env-based one too
-];
+].filter(Boolean);
 
 app.use(
   cors({
@@ -95,3 +96,4 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => console.log(`🚀 Server running on port ${PORT}`));
+
