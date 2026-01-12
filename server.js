@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 // server.js
 const express = require("express");
@@ -24,22 +23,34 @@ require('./jobs/tempOrderCleanup');
 // Middlewares
 // --------------------
 
+// Restrict CORS to allowed frontend origins
+const allowedOrigins = [
+  "https://www.bihariflavours.in",
+  "https://bihariflavours.in",
+  "https://bihari-flavours-frontend.vercel.app",
+  process.env.FRONTEND_URL, // keep env-based one too
+];
 
-// Restrict CORS to the frontend origin. Uses FRONTEND_URL env if provided,
-const allowedOrigins = [process.env.FRONTEND_URL];
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      // allow requests with no origin (like Postman, curl, server-to-server)
+      if (!origin) return callback(null, true);
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps, curl, or server-to-server)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('CORS policy: This origin is not allowed'));
-    }
-  },
-  credentials: true,
-}));
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        console.log("Blocked by CORS:", origin);
+        return callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
+
+
 connectDB();
 app.use(cookieParser());
 
@@ -76,4 +87,11 @@ app.get("/", (req, res) => {
 // Start Server
 // --------------------
 const PORT = process.env.PORT || 5000;
+app.use((err, req, res, next) => {
+  if (err.message === "Not allowed by CORS") {
+    return res.status(403).json({ success: false, message: err.message });
+  }
+  next(err);
+});
+
 app.listen(PORT, "0.0.0.0", () => console.log(`🚀 Server running on port ${PORT}`));
