@@ -81,7 +81,7 @@ exports.signup = async (req, res) => {
 
 return res.status(201).json(responseData);
 
-    catch (error) {
+  }catch (error) {
     console.error("Signup error:", error);
     return res.status(500).json({
       success: false,
@@ -140,7 +140,7 @@ const responseData = {
 
 return res.status(200).json(responseData);
 
-  catch (error) {
+  } catch (error) {
     console.error("Signin error:", error);
     return res.status(500).json({
       success: false,
@@ -168,5 +168,6 @@ exports.logout = async (req, res) => {
     });
   }
 };
+
 
 
