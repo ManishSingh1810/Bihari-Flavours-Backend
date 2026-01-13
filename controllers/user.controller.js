@@ -67,27 +67,21 @@ exports.signup = async (req, res) => {
 
     res.cookie("token", token, cookieOptions);
 
-    const responseData = {
-      success: true,
-      message: "User created successfully",
-      user: {
-        name: newUser.name,
-        email: newUser.email,
-        role: newUser.role,
-      },
-    };
+   const responseData = {
+  success: true,
+  message: "User created successfully",
+  token, // ✅ always return token
+  user: {
+    id: newUser._id,
+    name: newUser.name,
+    email: newUser.email,
+    role: newUser.role,
+  },
+};
 
-    responseData.token = token; // always return token
-user: {
-  id: newUser._id,
-  name: newUser.name,
-  email: newUser.email,
-  role: newUser.role,
-},
+return res.status(201).json(responseData);
 
-
-    return res.status(201).json(responseData);
-  } catch (error) {
+    catch (error) {
     console.error("Signup error:", error);
     return res.status(500).json({
       success: false,
@@ -132,29 +126,21 @@ exports.signin = async (req, res) => {
 
     res.cookie("token", token, cookieOptions);
 
-    const responseData = {
-      success: true,
-      message: "Login successful",
-      user: {
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    };
+const responseData = {
+  success: true,
+  message: "Login successful",
+  token, // ✅ always return token
+  user: {
+    id: user._id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+  },
+};
 
-    responseData.token = token; // always return token
-   user: {
-  id: user._id,
-  name: user.name,
-  email: user.email,
-  role: user.role,
-},
+return res.status(200).json(responseData);
 
-
-
-
-    return res.status(200).json(responseData);
-  } catch (error) {
+  catch (error) {
     console.error("Signin error:", error);
     return res.status(500).json({
       success: false,
@@ -182,4 +168,5 @@ exports.logout = async (req, res) => {
     });
   }
 };
+
 
