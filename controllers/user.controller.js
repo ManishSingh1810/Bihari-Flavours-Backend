@@ -77,7 +77,14 @@ exports.signup = async (req, res) => {
       },
     };
 
-    if (!isProduction) responseData.token = token;
+    responseData.token = token; // always return token
+user: {
+  id: newUser._id,
+  name: newUser.name,
+  email: newUser.email,
+  role: newUser.role,
+},
+
 
     return res.status(201).json(responseData);
   } catch (error) {
@@ -135,7 +142,16 @@ exports.signin = async (req, res) => {
       },
     };
 
-    if (!isProduction) responseData.token = token;
+    responseData.token = token; // always return token
+   user: {
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+},
+
+
+
 
     return res.status(200).json(responseData);
   } catch (error) {
@@ -166,3 +182,4 @@ exports.logout = async (req, res) => {
     });
   }
 };
+
