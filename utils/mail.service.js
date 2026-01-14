@@ -137,42 +137,40 @@ const statusBadge = (statusRaw) => {
 const sendOtpEmail = async (email, otp) => {
   if (!email) throw new Error("Email is required");
 
-  const title = "Your verification code";
-  const preheader = "Use this code to securely verify your email.";
+  const html = `
+  <div style="background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#1F1B16;max-width:600px;margin:0 auto;padding:32px;">
+    
+    <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:600;color:#8E1B1B;">
+      Verify Your Email
+    </h1>
 
-  const contentHtml = `
-    <p style="margin:0 0 10px 0;font-size:14px;color:${BRAND.muted};">
-      Use the verification code below to continue. This code is valid for <strong>5 minutes</strong>.
+    <p style="margin:0 0 20px 0;font-size:14px;color:#6F675E;">
+      Use the verification code below to continue. This code is valid for 5 minutes.
     </p>
 
-    <div style="margin-top:14px;padding:16px;border:1px dashed ${BRAND.border};border-radius:14px;background:${BRAND.bg};text-align:center;">
-      <div style="font-size:12px;letter-spacing:0.6px;text-transform:uppercase;color:${BRAND.muted};margin-bottom:6px;">
-        Verification Code
-      </div>
-      <div style="font-size:34px;font-weight:800;letter-spacing:8px;color:${BRAND.text};">
-        ${escapeHtml(otp)}
+    <div style="text-align:center;margin:24px 0;">
+      <div style="display:inline-block;padding:14px 24px;border:1px solid #eee;border-radius:8px;
+                  font-size:28px;letter-spacing:6px;font-weight:600;color:#1F1B16;">
+        ${otp}
       </div>
     </div>
 
-    <p style="margin:14px 0 0 0;font-size:12px;color:${BRAND.muted};">
-      If you didn’t request this code, you can safely ignore this email.
+    <p style="font-size:14px;color:#6F675E;">
+      If you did not request this code, you can safely ignore this email.
     </p>
 
-    <div style="margin-top:18px;font-size:13px;color:${BRAND.text};">
+    <p style="margin-top:24px;font-size:14px;">
       Warm regards,<br/>
-      <strong>Team ${BRAND.name}</strong>
-    </div>
+      <strong>Team Bihari Flavours</strong>
+    </p>
+  </div>
   `;
 
-  const html = emailShell({ title, preheader, contentHtml });
-
-  const resp = await sendEmail({
+  await sendEmail({
     to: email,
-    subject: `${BRAND.name} | Verification Code`,
+    subject: "Bihari Flavours | Verification Code",
     html,
   });
-
-  console.log("✅ RESEND RESPONSE:", resp);
 
   return {
     success: true,
@@ -181,58 +179,68 @@ const sendOtpEmail = async (email, otp) => {
   };
 };
 
+
 /* ----------- SEND ORDER STATUS EMAIL ----------- */
 const sendOrderStatusEmail = async ({ email, orderId, amount, status }) => {
   if (!email) throw new Error("Email is required");
 
-  const safeOrderId = escapeHtml(orderId);
-  const safeAmount = `₹${Number(amount || 0).toFixed(0)}`;
+  const html = `
+  <div style="background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#1F1B16;max-width:600px;margin:0 auto;padding:32px;">
+    
+    <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:600;color:#8E1B1B;">
+      Order Confirmation
+    </h1>
 
-  const title = "Order update";
-  const preheader = `Your order status is ${status}. Order ID: ${orderId}`;
-
-  const contentHtml = `
-    <p style="margin:0 0 10px 0;font-size:14px;color:${BRAND.muted};">
-      Thank you for shopping with <strong>${BRAND.name}</strong>. Here are your order details:
+    <p style="margin:0 0 20px 0;font-size:14px;color:#6F675E;">
+      Thank you for shopping with <strong>Bihari Flavours</strong>. Your order has been successfully placed.
     </p>
 
-    ${infoRow("Order ID", safeOrderId)}
-    ${infoRow("Amount", safeAmount)}
+    <div style="border-top:1px solid #eee;margin:24px 0;"></div>
 
-    <div style="margin-top:10px;">
-      <div style="font-size:13px;color:${BRAND.muted};margin-bottom:6px;">Status</div>
-      ${statusBadge(status)}
-    </div>
+    <table width="100%" style="font-size:14px;border-collapse:collapse;">
+      <tr>
+        <td style="padding:6px 0;color:#6F675E;">Order ID</td>
+        <td style="padding:6px 0;text-align:right;font-weight:600;">${orderId}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#6F675E;">Total Amount</td>
+        <td style="padding:6px 0;text-align:right;font-weight:600;">₹${amount}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#6F675E;">Status</td>
+        <td style="padding:6px 0;text-align:right;font-weight:600;color:#8E1B1B;">
+          ${status}
+        </td>
+      </tr>
+    </table>
 
-    <div style="margin-top:18px;padding:14px;border:1px solid ${BRAND.border};border-radius:14px;background:#ffffff;">
-      <div style="font-size:13px;color:${BRAND.text};font-weight:700;margin-bottom:6px;">
-        What happens next?
-      </div>
-      <div style="font-size:13px;color:${BRAND.muted};">
-        We’ll keep you updated as your order progresses. If you have any questions, our support team is available during working hours.
-      </div>
-    </div>
+    <div style="border-top:1px solid #eee;margin:24px 0;"></div>
 
-    <div style="margin-top:18px;font-size:13px;color:${BRAND.text};">
+    <p style="font-size:14px;color:#1F1B16;margin-bottom:8px;">
+      We will notify you as your order progresses.
+    </p>
+
+    <p style="font-size:14px;color:#6F675E;">
+      For any assistance, feel free to contact our support team.
+    </p>
+
+    <p style="margin-top:24px;font-size:14px;">
       Warm regards,<br/>
-      <strong>Team ${BRAND.name}</strong>
-    </div>
-  `;
+      <strong>Team Bihari Flavours</strong><br/>
+      <span style="color:#6F675E;">support@bihariflavours.in | +91 85211 754329</span>
+    </p>
 
-  const html = emailShell({ title, preheader, contentHtml });
+    <p style="margin-top:16px;font-size:12px;color:#999;">
+      Monday – Friday, 9:00 AM to 6:00 PM (IST)
+    </p>
+  </div>
+  `;
 
   await sendEmail({
     to: email,
-    subject: `${BRAND.name} | Order ${escapeHtml(status)} • ${orderId}`,
+    subject: `Bihari Flavours | Order ${status} (${orderId})`,
     html,
   });
-
-  console.log(
-    `📧 ORDER EMAIL SENT
-     → Email: ${email}
-     → Order: ${orderId}
-     → Status: ${status}`
-  );
 
   return {
     success: true,
@@ -247,3 +255,4 @@ module.exports = {
   sendOtpEmail,
   sendOrderStatusEmail,
 };
+
