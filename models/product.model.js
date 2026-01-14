@@ -43,10 +43,17 @@ const productSchema = new mongoose.Schema({
     type: String,
     enum: ['instock', 'outofstock'],
     default: 'instock'
-  }
+  },
+  netQuantity: { type: String, default: "" },
+shelfLife: { type: String, default: "" },
+ingredients: { type: String, default: "" },
+storage: { type: String, default: "" },
+country: { type: String, default: "India" },
+
 
 }, {
   timestamps: true
 });
 
 module.exports = mongoose.model('Product', productSchema);
+
