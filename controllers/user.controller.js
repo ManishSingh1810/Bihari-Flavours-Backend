@@ -155,7 +155,16 @@ return res.status(200).json(responseData);
 ===================== */
 exports.logout = async (req, res) => {
   try {
-    res.clearCookie("token", cookieOptions);
+    const isProduction = process.env.NODE_ENV === "production";
+
+res.clearCookie("token", {
+  httpOnly: true,
+  secure: isProduction,
+  sameSite: isProduction ? "None" : "Lax",
+  path: "/",
+});
+
+    // res.clearCookie("token", cookieOptions);
 
     return res.status(200).json({
       success: true,
@@ -169,6 +178,7 @@ exports.logout = async (req, res) => {
     });
   }
 };
+
 
 
 
