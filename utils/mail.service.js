@@ -184,15 +184,68 @@ const sendOtpEmail = async (email, otp) => {
 const sendOrderStatusEmail = async ({ email, orderId, amount, status }) => {
   if (!email) throw new Error("Email is required");
 
+  const s = String(status || "").toLowerCase();
+
+  // ---------- Dynamic content based on status ----------
+  let heading = "Order Update";
+  let intro = `Thank you for shopping with <strong>Bihari Flavours</strong>.`;
+  let statusLine = `${status}`;
+  let nextText =
+    "We’ll keep you updated as your order progresses.";
+
+  if (s.includes("placed") || s.includes("confirmed")) {
+    heading = "Order Confirmed";
+    intro =
+      `Thank you for shopping with <strong>Bihari Flavours</strong>. Your order has been successfully placed.`;
+    nextText =
+      "We’ll notify you when your order is shipped.";
+  } else if (s.includes("packed") || s.includes("processing")) {
+    heading = "Order Processing";
+    intro =
+      `Your order is being prepared with care.`;
+    nextText =
+      "We’ll notify you as soon as it’s shipped.";
+  } else if (s.includes("shipped") || s.includes("dispatched")) {
+    heading = "Order Shipped";
+    intro =
+      `Good news — your order has been shipped.`;
+    nextText =
+      "It’s on the way. We’ll notify you once it’s delivered.";
+  } else if (s.includes("out for delivery")) {
+    heading = "Out for Delivery";
+    intro =
+      `Your order is out for delivery and will reach you soon.`;
+    nextText =
+      "If you need help, contact our support team.";
+  } else if (s.includes("delivered")) {
+    heading = "Order Delivered";
+    intro =
+      `Your order has been delivered. We hope you enjoy it!`;
+    nextText =
+      "If anything is not right, please contact support within 24 hours.";
+  } else if (s.includes("cancel") || s.includes("cancelled")) {
+    heading = "Order Cancelled";
+    intro =
+      `Your order has been cancelled.`;
+    nextText =
+      "If you have questions about this cancellation, please contact support.";
+  } else if (s.includes("failed")) {
+    heading = "Order Update";
+    intro =
+      `We couldn’t process your order successfully.`;
+    nextText =
+      "Please contact support and we’ll help you right away.";
+  }
+
   const html = `
   <div style="background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#1F1B16;max-width:600px;margin:0 auto;padding:32px;">
     
     <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:600;color:#8E1B1B;">
-      Order Confirmation
+      ${heading}
     </h1>
 
     <p style="margin:0 0 20px 0;font-size:14px;color:#6F675E;">
-      Thank you for shopping with <strong>Bihari Flavours</strong>. Your order has been successfully placed.
+      ${intro}
     </p>
 
     <div style="border-top:1px solid #eee;margin:24px 0;"></div>
@@ -209,18 +262,18 @@ const sendOrderStatusEmail = async ({ email, orderId, amount, status }) => {
       <tr>
         <td style="padding:6px 0;color:#6F675E;">Status</td>
         <td style="padding:6px 0;text-align:right;font-weight:600;color:#8E1B1B;">
-          ${status}
+          ${statusLine}
         </td>
       </tr>
     </table>
 
     <div style="border-top:1px solid #eee;margin:24px 0;"></div>
 
-    <p style="font-size:14px;color:#1F1B16;margin-bottom:8px;">
-      We will notify you as your order progresses.
+    <p style="font-size:14px;color:#1F1B16;margin:0 0 8px 0;">
+      ${nextText}
     </p>
 
-    <p style="font-size:14px;color:#6F675E;">
+    <p style="font-size:14px;color:#6F675E;margin:0;">
       For any assistance, feel free to contact our support team.
     </p>
 
@@ -238,7 +291,7 @@ const sendOrderStatusEmail = async ({ email, orderId, amount, status }) => {
 
   await sendEmail({
     to: email,
-    subject: `Bihari Flavours | Order ${status} (${orderId})`,
+    subject: `Bihari Flavours | ${heading} (${orderId})`,
     html,
   });
 
@@ -251,8 +304,10 @@ const sendOrderStatusEmail = async ({ email, orderId, amount, status }) => {
   };
 };
 
+
 module.exports = {
   sendOtpEmail,
   sendOrderStatusEmail,
 };
+
 
