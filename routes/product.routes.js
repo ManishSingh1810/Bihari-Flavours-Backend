@@ -20,8 +20,8 @@ const {
 ===================== */
 router.get("/", getProducts);
 router.get("/:id", getProductById);
-router.get("/:id/reviews", productController.getProductReviews);
-router.post("/:id/reviews", protect, productController.addProductReview);
+router.get("/:id/reviews", getProductReviews);
+router.post("/:id/reviews", protect, addProductReview);
 
 /* =====================
    ADMIN ROUTES
@@ -47,5 +47,6 @@ router.delete(
 );
 
 module.exports = router;
+
 
 
