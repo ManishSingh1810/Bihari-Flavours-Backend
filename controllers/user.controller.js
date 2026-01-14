@@ -166,6 +166,15 @@ res.clearCookie("token", {
 
     // res.clearCookie("token", cookieOptions);
 
+        // Extra safety: overwrite cookie as expired
+    res.cookie("token", "", {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: isProduction ? "None" : "Lax",
+      path: "/",
+      expires: new Date(0),
+    });
+
     return res.status(200).json({
       success: true,
       message: "Logged out successfully",
@@ -178,6 +187,7 @@ res.clearCookie("token", {
     });
   }
 };
+
 
 
 
