@@ -7,7 +7,7 @@ const fs = require("fs");
 ====================================================== */
 exports.addProduct = async (req, res) => {
   try {
-    const { name, desc, price, quantity } = req.body;
+    const { name, desc, price, quantity, netQuantity, shelfLife, ingredients, storage, country } = req.body;
 
     /* ----------------------------
        VALIDATION
@@ -51,6 +51,11 @@ exports.addProduct = async (req, res) => {
       desc,
       price,
       quantity,
+      netQuantity,
+      shelfLife,
+      ingredients,
+      storage,
+      country: country || "India",
       photos: imageUrls
     });
 
@@ -121,7 +126,7 @@ exports.getProductById = async (req, res) => {
 ====================================================== */
 exports.updateProduct = async (req, res) => {
   try {
-    const { name, desc, price, quantity } = req.body;
+    const { name, desc, price, quantity, netQuantity, shelfLife, ingredients, storage, country } = req.body;
 
     const product = await Product.findById(req.params.id);
     if (!product) {
@@ -155,6 +160,12 @@ exports.updateProduct = async (req, res) => {
     product.desc = desc ?? product.desc;
     product.price = price ?? product.price;
     product.quantity = quantity ?? product.quantity;
+    product.netQuantity = netQuantity ?? product.netQuantity;
+    product.shelfLife = shelfLife ?? product.shelfLife;
+    product.ingredients = ingredients ?? product.ingredients;
+    product.storage = storage ?? product.storage;
+    product.country = country ?? product.country;
+
 
     await product.save();
 
@@ -209,3 +220,4 @@ exports.deleteProduct = async (req, res) => {
     });
   }
 };
+
