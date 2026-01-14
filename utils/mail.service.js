@@ -12,7 +12,7 @@ const sendOtpEmail = async (email, otp) => {
       <h1 style="letter-spacing: 4px;">${otp}</h1>
       <p>This OTP is valid for 5 minutes.</p>
       <br />
-      <p>– Team Bihar</p>
+      <p>– Team Bihari Flavours</p>
     </div>
   `;
 //await sendEmail({
@@ -53,7 +53,7 @@ const sendOrderStatusEmail = async ({
       <p><strong>Status:</strong> ${status}</p>
       <br />
       <p>Thank you for ordering with us 🙏</p>
-      <p>– Team Bihar</p>
+      <p>– Team Bihari Flavours</p>
     </div>
   `;
 
@@ -83,5 +83,6 @@ module.exports = {
   sendOtpEmail,
   sendOrderStatusEmail,
 };
+
 
 
