@@ -19,7 +19,8 @@ exports.addProduct = async (req, res) => {
       });
     }
 
-    const existingProduct = await Product.findOne({ name: name.trim() });
+  const existingProduct = await Product.findOne({ name: name.trim() }).collation({ locale: "en", strength: 2 });
+
     if (existingProduct) {
       return res.status(400).json({
         success: false,
@@ -220,4 +221,5 @@ exports.deleteProduct = async (req, res) => {
     });
   }
 };
+
 
