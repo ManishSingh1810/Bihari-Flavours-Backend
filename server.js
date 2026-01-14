@@ -17,6 +17,7 @@ const orderRoutes = require("./routes/order.routes");
 const {razorpayWebhook} = require("./controllers/order.controller");
 
 const app = express();
+app.set("trust proxy", 1);
 
 // 🔥 START CRON JOBS
 require('./jobs/tempOrderCleanup');
@@ -47,7 +48,7 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
   })
 );
 
@@ -96,4 +97,5 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, "0.0.0.0", () => console.log(`🚀 Server running on port ${PORT}`));
+
 
