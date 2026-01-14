@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const upload = require("../middleware/multer");
 const { adminProtect } = require("../middleware/admin.middleware");
+const { protect } = require("../middleware/auth.middleware");
 
 const {
   addProduct,
@@ -16,6 +17,8 @@ const {
 ===================== */
 router.get("/", getProducts);
 router.get("/:id", getProductById);
+router.get("/:id/reviews", productController.getProductReviews);
+router.post("/:id/reviews", protect, productController.addProductReview);
 
 /* =====================
    ADMIN ROUTES
@@ -41,3 +44,4 @@ router.delete(
 );
 
 module.exports = router;
+
