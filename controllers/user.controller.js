@@ -2,7 +2,8 @@ const User = require("../models/user.model");
 const Otp = require("../models/otp.model");
 const { generateToken } = require("../utils/jwt");
 
-const isProduction = process.env.USE_HTTPS === "true";
+const isProduction = process.env.NODE_ENV === "production";
+
 
 /* ---------------- COOKIE OPTIONS ---------------- */
 const cookieOptions = {
@@ -168,6 +169,7 @@ exports.logout = async (req, res) => {
     });
   }
 };
+
 
 
 
