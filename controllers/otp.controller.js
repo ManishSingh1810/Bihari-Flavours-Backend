@@ -5,7 +5,8 @@ const { generateToken } = require("../utils/jwt");
 
 const VALID_PURPOSES = ["signup", "login", "forgot"];
 
-const isProduction = process.env.USE_HTTPS === "true";
+const isProduction = process.env.NODE_ENV === "production";
+
 
 /* ---------------- COOKIE OPTIONS ---------------- */
 const cookieOptions = {
@@ -238,3 +239,4 @@ exports.verifyOtpController = async (req, res) => {
     });
   }
 };
+
