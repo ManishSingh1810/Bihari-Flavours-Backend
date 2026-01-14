@@ -10,6 +10,9 @@ const {
   getProductById,
   updateProduct,
   deleteProduct,
+  getProductReviews,
+  addProductReview
+
 } = require("../controllers/product.controller");
 
 /* =====================
@@ -44,4 +47,5 @@ router.delete(
 );
 
 module.exports = router;
+
 
