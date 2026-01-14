@@ -110,3 +110,56 @@ exports.getAllCoupons = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to get coupons", error: error.message });
   }
 };
+
+// =====================
+// APPLY COUPON (USER)
+// =====================
+exports.applyCoupon = async (req, res) => {
+  try {
+    const { code, cartTotal } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ success: false, message: "Coupon code is required" });
+    }
+
+    const coupon = await Coupon.findOne({ code: code.toUpperCase(), status: "active" });
+
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: "Invalid or inactive coupon" });
+    }
+
+    const total = Number(cartTotal || 0);
+
+    if (total < coupon.minPurchase) {
+      return res.status(400).json({
+        success: false,
+        message: `Minimum purchase is ₹${coupon.minPurchase}`,
+      });
+    }
+
+    if (total > coupon.maxPurchase) {
+      return res.status(400).json({
+        success: false,
+        message: `Maximum purchase for this coupon is ₹${coupon.maxPurchase}`,
+      });
+    }
+
+    // Basic discount calculation
+    const discount = Math.round((total * coupon.discountPercentage) / 100);
+    const finalTotal = Math.max(total - discount, 0);
+
+    return res.status(200).json({
+      success: true,
+      message: "Coupon applied",
+      coupon: {
+        code: coupon.code,
+        discountPercentage: coupon.discountPercentage,
+      },
+      discount,
+      finalTotal,
+    });
+  } catch (error) {
+    console.error("Apply coupon error:", error);
+    return res.status(500).json({ success: false, message: "Failed to apply coupon" });
+  }
+};
