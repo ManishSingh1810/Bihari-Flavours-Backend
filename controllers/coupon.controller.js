@@ -128,7 +128,8 @@ exports.applyCoupon = async (req, res) => {
       return res.status(404).json({ success: false, message: "Invalid or inactive coupon" });
     }
 
-    const total = Number(cartTotal || 0);
+const total = Number(req.body.cartTotal || req.body.cartAmount || 0);
+
 
     if (total < coupon.minPurchase) {
       return res.status(400).json({
@@ -163,3 +164,4 @@ exports.applyCoupon = async (req, res) => {
     return res.status(500).json({ success: false, message: "Failed to apply coupon" });
   }
 };
+
