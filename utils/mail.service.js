@@ -139,7 +139,17 @@ const sendOtpEmail = async (email, otp) => {
 
   const html = `
   <div style="background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#1F1B16;max-width:600px;margin:0 auto;padding:32px;">
-    
+
+     <!-- LOGO -->
+    <div style="text-align:center;margin-bottom:22px;">
+      <img 
+        src="https://www.bihariflavours.in/hero.jpg"
+        width="120"
+        alt="Bihari Flavours"
+        style="display:inline-block;border-radius:10px;max-width:120px;height:auto;"
+      />
+    </div>
+
     <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:600;color:#8E1B1B;">
       Verify Your Email
     </h1>
@@ -239,7 +249,17 @@ const sendOrderStatusEmail = async ({ email, orderId, amount, status }) => {
 
   const html = `
   <div style="background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#1F1B16;max-width:600px;margin:0 auto;padding:32px;">
+        <!-- LOGO -->
+    <div style="text-align:center;margin-bottom:22px;">
+      <img 
+        src="https://www.bihariflavours.in/hero.jpg"
+        width="120"
+        alt="Bihari Flavours"
+        style="display:inline-block;border-radius:10px;max-width:120px;height:auto;"
+      />
+    </div>
     
+
     <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:600;color:#8E1B1B;">
       ${heading}
     </h1>
@@ -309,5 +329,6 @@ module.exports = {
   sendOtpEmail,
   sendOrderStatusEmail,
 };
+
 
 
