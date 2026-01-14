@@ -57,7 +57,9 @@ const orderSchema = new mongoose.Schema(
 
     couponId: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon" },
     transactionId: { type: mongoose.Schema.Types.ObjectId, ref: "TransactionModel" },
-    razorpayOrderId: { type: String, unique: true, sparse: true, default: null },
+    razorpayOrderId: { type: String, unique: true, sparse: true }, // ✅ remove default: null
+
+    //razorpayOrderId: { type: String, unique: true, sparse: true, default: null },
   },
   { timestamps: true }
 );
@@ -138,6 +140,7 @@ orderSchema.post("findOneAndUpdate", async function () {
 const Order = mongoose.model("Order", orderSchema);
 module.exports = Order;
 module.exports.orderItemSchema = orderItemSchema;
+
 
 
 
