@@ -1,3 +1,4 @@
+const Review = require("../models/review.model");
 const Product = require("../models/product.model");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
@@ -221,5 +222,50 @@ exports.deleteProduct = async (req, res) => {
     });
   }
 };
+exports.getProductReviews = async (req, res) => {
+  try {
+    const reviews = await Review.find({ productId: req.params.id })
+      .sort({ createdAt: -1 })
+      .limit(50);
+
+    res.status(200).json({ success: true, reviews });
+  } catch (e) {
+    res.status(500).json({ success: false, message: "Failed to fetch reviews" });
+  }
+};
+
+exports.addProductReview = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { rating, comment } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ success: false, message: "Rating must be 1 to 5" });
+    }
+    if (!comment || !comment.trim()) {
+      return res.status(400).json({ success: false, message: "Review comment is required" });
+    }
+
+    const review = await Review.create({
+      productId: req.params.id,
+      userId,
+      userName: req.user.name || "Customer",
+      rating,
+      comment: comment.trim(),
+    });
+
+    res.status(201).json({ success: true, review });
+  } catch (e) {
+    if (e.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: "You already reviewed this product. (One review per product)",
+      });
+    }
+    res.status(500).json({ success: false, message: "Failed to submit review" });
+  }
+};
+
+
 
 
