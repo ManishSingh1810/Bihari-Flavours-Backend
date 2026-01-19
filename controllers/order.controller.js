@@ -315,10 +315,22 @@ exports.getUserOrders = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    // Combine active orders + history so user sees ALL statuses in one list.
+    // Optional query flags (defaults are "true" for best UX)
+    const includeAll = String(req.query.includeAll ?? "true").toLowerCase() !== "false";
+    const includeOnline = String(req.query.includeOnline ?? "true").toLowerCase() !== "false";
+    const includeCOD = String(req.query.includeCOD ?? "true").toLowerCase() !== "false";
+
+    const methods = [];
+    if (includeCOD) methods.push("COD");
+    if (includeOnline) methods.push("ONLINE");
+
+    const methodFilter = methods.length ? { paymentMethod: { $in: methods } } : {};
+
     const [activeOrders, historyOrders] = await Promise.all([
-      Order.find({ userId }).sort({ createdAt: -1 }),
-      OrderHistory.find({ userId }).sort({ completedAt: -1, createdAt: -1 }),
+      Order.find({ userId, ...methodFilter }).sort({ createdAt: -1 }),
+      includeAll
+        ? OrderHistory.find({ userId, ...methodFilter }).sort({ completedAt: -1, createdAt: -1 })
+        : Promise.resolve([]),
     ]);
 
     const merged = [
