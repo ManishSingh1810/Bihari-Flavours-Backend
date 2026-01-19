@@ -20,6 +20,13 @@ const presentOrder = (orderDoc) => {
   };
 };
 
+const getOrderSortDate = (obj) => {
+  // Active orders have createdAt, history orders have completedAt (plus timestamps too)
+  const d = obj.completedAt || obj.createdAt;
+  const ms = d ? new Date(d).getTime() : 0;
+  return Number.isFinite(ms) ? ms : 0;
+};
+
 /* ======================================================
    VERIFY COUPON
 ====================================================== */
@@ -308,11 +315,20 @@ exports.getUserOrders = async (req, res) => {
   try {
     const userId = req.user._id;
 
-    const orders = await Order.find({ userId }).sort({ createdAt: -1 });
+    // Combine active orders + history so user sees ALL statuses in one list.
+    const [activeOrders, historyOrders] = await Promise.all([
+      Order.find({ userId }).sort({ createdAt: -1 }),
+      OrderHistory.find({ userId }).sort({ completedAt: -1, createdAt: -1 }),
+    ]);
+
+    const merged = [
+      ...activeOrders.map((o) => ({ ...presentOrder(o), isHistory: false })),
+      ...historyOrders.map((h) => ({ ...presentOrder(h), isHistory: true })),
+    ].sort((a, b) => getOrderSortDate(b) - getOrderSortDate(a));
 
     res.status(200).json({
       success: true,
-      orders: orders.map(presentOrder)
+      orders: merged
     });
 
   } catch {
@@ -331,10 +347,18 @@ exports.getOrderDetails = async (req, res) => {
     const idParam = String(req.params.id || "").trim();
     const isOrderCode = /^\d{4}$/.test(idParam);
 
-    const order = await Order.findOne({
+    let order = await Order.findOne({
       userId: req.user._id,
       ...(isOrderCode ? { orderCode: idParam } : { _id: idParam }),
     });
+
+    // If not found in active orders, try order history so details work for Delivered/Cancelled.
+    if (!order) {
+      order = await OrderHistory.findOne({
+        userId: req.user._id,
+        ...(isOrderCode ? { orderCode: idParam } : { _id: idParam }),
+      });
+    }
 
     if (!order) {
       return res.status(404).json({
