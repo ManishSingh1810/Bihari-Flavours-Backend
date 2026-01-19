@@ -10,6 +10,8 @@ const cleanOrder = async (order) => {
   const obj = order.toObject();
 
   delete obj.transactionId;
+  // ✅ 4-digit id for UI (same for user + admin)
+  obj.orderId = obj.orderCode || obj._id;
 
   if (obj.couponId) {
     const coupon = await Coupon.findById(obj.couponId).lean();
@@ -114,6 +116,7 @@ exports.updateOrderStatus = async (req, res) => {
           [
             {
               originalOrderId: order._id,
+              orderCode: order.orderCode,
               userId: order.userId,
               items: order.items,
               totalAmount: order.totalAmount,
@@ -190,6 +193,7 @@ exports.getOrderHistory = async (req, res) => {
 
     const enrichedHistory = history.map((h) => {
       const obj = h.toObject ? h.toObject() : h;
+      obj.orderId = obj.orderCode || obj._id;
 
       obj.customerName =
         obj.userId?.name || obj.shippingAddress?.name || "";
@@ -218,8 +222,10 @@ exports.getOrderHistory = async (req, res) => {
 // ----------------------------
 exports.getOrderById = async (req, res) => {
   try {
-    const order = await Order.findById(req.params.id)
-      // 🔁 CHANGE HERE: phone → email
+    const idParam = String(req.params.id || "").trim();
+    const isOrderCode = /^\d{4}$/.test(idParam);
+
+    const order = await Order.findOne(isOrderCode ? { orderCode: idParam } : { _id: idParam })
       .populate("userId", "name email");
 
     if (!order)
@@ -258,6 +264,7 @@ exports.getOrderHistoryById = async (req, res) => {
       });
 
     const obj = history.toObject ? history.toObject() : history;
+    obj.orderId = obj.orderCode || obj._id;
 
     obj.customerName =
       obj.userId?.name || obj.shippingAddress?.name || "";

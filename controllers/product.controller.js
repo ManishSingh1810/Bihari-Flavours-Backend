@@ -83,10 +83,41 @@ exports.addProduct = async (req, res) => {
 ====================================================== */
 exports.getProducts = async (req, res) => {
   try {
-    const products = await Product.find().sort({ createdAt: -1 });
+    const q = String(req.query.q || req.query.search || "").trim();
+    const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 24, 1), 100);
+    const sortRaw = String(req.query.sort || "newest");
+    const inStockOnly = String(req.query.inStock || req.query.instock || "").toLowerCase() === "true";
+
+    const filter = {};
+    if (inStockOnly) filter.quantity = "instock";
+    if (q) {
+      // For small catalogs this is fine; if you grow, add text indexes / Atlas Search later.
+      const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+      filter.$or = [{ name: rx }, { desc: rx }];
+    }
+
+    const sort = (() => {
+      if (sortRaw === "price_asc") return { price: 1 };
+      if (sortRaw === "price_desc") return { price: -1 };
+      if (sortRaw === "oldest") return { createdAt: 1 };
+      return { createdAt: -1 }; // newest
+    })();
+
+    const [total, products] = await Promise.all([
+      Product.countDocuments(filter),
+      Product.find(filter)
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit),
+    ]);
+
     res.status(200).json({
       success: true,
       count: products.length,
+      total,
+      page,
+      pages: Math.ceil(total / limit) || 1,
       products
     });
   } catch (error) {

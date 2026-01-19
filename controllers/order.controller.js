@@ -8,6 +8,17 @@ const OrderHistory = require('../models/orderhistory.model');
 const Coupon = require('../models/coupon.model');
 const Cart = require('../models/cart.model');
 const razorpay = require('../config/razorpay');
+const { generateUniqueOrderCode } = require('../utils/orderCode');
+
+const presentOrder = (orderDoc) => {
+  if (!orderDoc) return orderDoc;
+  const obj = orderDoc.toObject ? orderDoc.toObject() : orderDoc;
+  return {
+    ...obj,
+    // ✅ 4-digit id for UI (same for user + admin)
+    orderId: obj.orderCode || obj.orderId || obj._id,
+  };
+};
 
 /* ======================================================
    VERIFY COUPON
@@ -105,6 +116,7 @@ exports.createOrder = async (req, res) => {
     ====================================================== */
     if (paymentMethod === 'COD') {
       totalAmount += 30;
+      const orderCode = await generateUniqueOrderCode({ Order, OrderHistory, session });
 
       const [order] = await Order.create([{
         userId,
@@ -113,7 +125,8 @@ exports.createOrder = async (req, res) => {
         paymentMethod: 'COD',
         totalAmount,
         couponId: coupon?._id,
-        paymentStatus: 'Pending'
+        paymentStatus: 'Pending',
+        orderCode
       }], { session });
 
       await Cart.findOneAndUpdate(
@@ -127,7 +140,8 @@ exports.createOrder = async (req, res) => {
 
       return res.status(200).json({
         success: true,
-        order,
+        order: presentOrder(order),
+        orderId: order.orderCode,
         message: 'COD order placed successfully'
       });
     }
@@ -212,6 +226,7 @@ exports.razorpayWebhook = async (req, res) => {
 
       if (!tempOrder) throw new Error('Temp order not found');
 
+      const orderCode = await generateUniqueOrderCode({ Order, OrderHistory, session });
       const [order] = await Order.create([{
         userId: tempOrder.userId,
         items: tempOrder.items,
@@ -220,7 +235,8 @@ exports.razorpayWebhook = async (req, res) => {
         totalAmount: tempOrder.totalAmount,
         couponId: tempOrder.couponId,
         paymentStatus: 'Paid',
-        razorpayOrderId: tempOrder.razorpayOrderId
+        razorpayOrderId: tempOrder.razorpayOrderId,
+        orderCode
       }], { session });
 
       await TransactionModel.create([{
@@ -296,7 +312,7 @@ exports.getUserOrders = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      orders
+      orders: orders.map(presentOrder)
     });
 
   } catch {
@@ -312,9 +328,12 @@ exports.getUserOrders = async (req, res) => {
 ====================================================== */
 exports.getOrderDetails = async (req, res) => {
   try {
+    const idParam = String(req.params.id || "").trim();
+    const isOrderCode = /^\d{4}$/.test(idParam);
+
     const order = await Order.findOne({
-      _id: req.params.id,
-      userId: req.user._id
+      userId: req.user._id,
+      ...(isOrderCode ? { orderCode: idParam } : { _id: idParam }),
     });
 
     if (!order) {
@@ -326,13 +345,65 @@ exports.getOrderDetails = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      order
+      order: presentOrder(order)
     });
 
   } catch {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch order details'
+    });
+  }
+};
+
+/* ======================================================
+   GET USER ORDER HISTORY (DELIVERED / CANCELLED)
+====================================================== */
+exports.getUserOrderHistory = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const history = await OrderHistory.find({ userId }).sort({ completedAt: -1, createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      orders: history.map(presentOrder),
+    });
+  } catch {
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch order history",
+    });
+  }
+};
+
+/* ======================================================
+   GET USER ORDER HISTORY DETAILS
+====================================================== */
+exports.getUserOrderHistoryDetails = async (req, res) => {
+  try {
+    const idParam = String(req.params.id || "").trim();
+    const isOrderCode = /^\d{4}$/.test(idParam);
+
+    const history = await OrderHistory.findOne({
+      userId: req.user._id,
+      ...(isOrderCode ? { orderCode: idParam } : { _id: idParam }),
+    });
+
+    if (!history) {
+      return res.status(404).json({
+        success: false,
+        message: "Order history not found",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      order: presentOrder(history),
+    });
+  } catch {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch order history details",
     });
   }
 };

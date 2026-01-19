@@ -8,6 +8,8 @@ const {
   getUserOrders,
   getOrderDetails,
   verifyCoupon,
+  getUserOrderHistory,
+  getUserOrderHistoryDetails,
 } = require('../controllers/order.controller');
 
 const {
@@ -37,6 +39,10 @@ router.get('/my-orders', protect, getUserOrders);
 
 // Get single order details (user)
 router.get('/my-orders/:id', protect, getOrderDetails);
+
+// Order history (delivered/cancelled)
+router.get('/my-history', protect, getUserOrderHistory);
+router.get('/my-history/:id', protect, getUserOrderHistoryDetails);
 
 
 // --------------------

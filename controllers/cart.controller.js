@@ -1,6 +1,19 @@
 const Cart = require("../models/cart.model");
 const Product = require("../models/product.model");
 
+const summarizeCart = (cart, userId) => {
+  const safe = cart || { userId, cartItems: [], totalAmount: 0 };
+  const cartItems = safe.cartItems || [];
+  const cartItemCount = cartItems.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
+  const distinctItemCount = cartItems.length;
+
+  return {
+    cart: safe,
+    cartItemCount,
+    distinctItemCount,
+  };
+};
+
 // Add to Cart
 exports.addToCart = async (req, res) => {
   try {
@@ -79,7 +92,7 @@ exports.addToCart = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Product added to cart successfully",
-      cart
+      ...summarizeCart(cart, userId)
     });
 
   } catch (error) {
@@ -136,7 +149,7 @@ exports.updateCart = async (req, res) => {
       return res.status(200).json({
         success: true,
         message: "Cart is now empty",
-        cart: { userId, cartItems: [], totalAmount: 0 }
+        ...summarizeCart(null, userId)
       });
     }
 
@@ -146,7 +159,7 @@ exports.updateCart = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Cart updated successfully",
-      cart
+      ...summarizeCart(cart, userId)
     });
   } catch (error) {
     console.error("Update cart error:", error);
@@ -163,7 +176,7 @@ exports.deleteCart = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Cart deleted successfully",
-      cart: { userId, cartItems: [], totalAmount: 0 }
+      ...summarizeCart(null, userId)
     });
   } catch (error) {
     console.error("Delete cart error:", error);
@@ -180,7 +193,7 @@ exports.getCart = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Cart retrieved successfully",
-      cart: cart || { userId, cartItems: [], totalAmount: 0 }
+      ...summarizeCart(cart, userId)
     });
   } catch (error) {
     console.error("Get cart error:", error);

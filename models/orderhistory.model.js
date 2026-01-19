@@ -2,6 +2,10 @@ const mongoose = require('mongoose');
 const { orderItemSchema } = require('./order.model');
 
 const orderHistorySchema = new mongoose.Schema({
+  // ✅ Same 4-digit id as the original order (kept forever in history)
+  // sparse: true to avoid breaking existing docs after deployment
+  orderCode: { type: String, unique: true, sparse: true, index: true },
+
   originalOrderId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Order',

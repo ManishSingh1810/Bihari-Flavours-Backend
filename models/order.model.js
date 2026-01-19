@@ -16,6 +16,11 @@ const orderSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 
+    // ✅ Short, user-friendly order id (4 digits)
+    // Stored as string to preserve leading zeros (e.g. "0007")
+    // sparse: true to avoid breaking existing docs that don't have this field yet
+    orderCode: { type: String, unique: true, sparse: true, index: true },
+
     items: {
       type: [orderItemSchema],
       required: true,
@@ -85,7 +90,7 @@ orderSchema.post("save", async function (doc) {
 
     await sendOrderStatusEmail({
       email: user.email,
-      orderId: doc._id,
+      orderId: doc.orderCode || doc._id,
       amount: doc.totalAmount,
       status: "Placed",
     });
@@ -125,7 +130,7 @@ orderSchema.post("findOneAndUpdate", async function () {
 
     await sendOrderStatusEmail({
       email: user.email,
-      orderId: this._orderBeforeUpdate._id,
+      orderId: this._orderBeforeUpdate.orderCode || this._orderBeforeUpdate._id,
       amount: this._orderBeforeUpdate.totalAmount,
       status: this._newStatus,
     });
