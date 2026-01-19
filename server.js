@@ -15,6 +15,7 @@ const cartRoutes = require("./routes/cart.routes");
 const couponRoutes = require("./routes/coupon.routes");
 const orderRoutes = require("./routes/order.routes"); 
 const {razorpayWebhook} = require("./controllers/order.controller");
+const { logout } = require("./controllers/user.controller");
 
 const app = express();
 app.set("trust proxy", 1);
@@ -70,6 +71,12 @@ app.use(express.json());
 // Connect to MongoDB
 // --------------------
 app.use("/api/orders", orderRoutes); // ✅ Use order routes
+
+// --------------------
+// LOGOUT (extra aliases for admin/frontends)
+// --------------------
+app.all("/api/logout", logout);
+app.all("/api/admin/logout", logout);
 
 // --------------------
 // Routes
