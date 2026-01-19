@@ -71,7 +71,7 @@ exports.updateOrderStatus = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { id } = req.params;
+    const idParam = String(req.params.id || "").trim();
     const { orderStatus } = req.body;
 
     if (!orderStatus) {
@@ -83,7 +83,9 @@ exports.updateOrderStatus = async (req, res) => {
       });
     }
 
-    const order = await Order.findById(id).session(session);
+    const isOrderCode = /^\d{4}$/.test(idParam);
+
+    const order = await Order.findOne(isOrderCode ? { orderCode: idParam } : { _id: idParam }).session(session);
     if (!order) {
       await session.abortTransaction();
       session.endSession();
