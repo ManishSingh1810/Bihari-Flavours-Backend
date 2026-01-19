@@ -24,7 +24,12 @@ const getOrCreateHomepage = async () => {
 exports.getHomepage = async (req, res) => {
   try {
     const homepage = await getOrCreateHomepage();
-    return res.status(200).json({ success: true, homepage });
+    return res.status(200).json({
+      success: true,
+      homepage: {
+        heroSlides: normalizeSlides(homepage.heroSlides),
+      },
+    });
   } catch (e) {
     return res.status(500).json({ success: false, message: "Failed to fetch homepage" });
   }
@@ -102,8 +107,9 @@ exports.updateHomepage = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Homepage updated successfully",
-      homepage,
+      homepage: {
+        heroSlides: normalizeSlides(homepage.heroSlides),
+      },
     });
   } catch (e) {
     return res.status(500).json({ success: false, message: "Failed to update homepage" });
