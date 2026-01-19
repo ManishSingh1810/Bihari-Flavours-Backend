@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 
 const upload = require("../middleware/multer");
-const { protect } = require("../middleware/auth.middleware");
 const { adminProtect } = require("../middleware/admin.middleware");
 const { getHomepage, updateHomepage } = require("../controllers/homepage.controller");
 
@@ -10,15 +9,18 @@ const { getHomepage, updateHomepage } = require("../controllers/homepage.control
 router.get("/homepage", getHomepage);
 
 // Admin (multipart)
+// Accept both PUT and POST because some clients struggle with multipart PUT.
 router.put(
   "/admin/homepage",
-  protect,
   adminProtect,
-  upload.fields([
-    { name: "hero1", maxCount: 1 },
-    { name: "hero2", maxCount: 1 },
-    { name: "hero3", maxCount: 1 },
-  ]),
+  upload.any(),
+  updateHomepage
+);
+
+router.post(
+  "/admin/homepage",
+  adminProtect,
+  upload.any(),
   updateHomepage
 );
 

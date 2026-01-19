@@ -53,28 +53,45 @@ exports.updateHomepage = async (req, res) => {
     // Start from either incoming or current
     const slides = incomingSlides ?? normalizeSlides(homepage.heroSlides);
 
-    // 2) Upload provided hero images and map to slide indexes
-    const fileMap = [
-      { field: "hero1", idx: 0 },
-      { field: "hero2", idx: 1 },
-      { field: "hero3", idx: 2 },
-    ];
+    // 2) Upload provided hero images and map to slide indexes.
+    // Supports:
+    // - hero1/hero2/hero3 (recommended)
+    // - heroN (any N)
+    // - heroImages[] where each file has a fieldname like heroImages (falls back to 1..n order)
+    const files = Array.isArray(req.files) ? req.files : [];
+    const heroFiles = files.filter((f) => f && typeof f.fieldname === "string");
 
-    for (const { field, idx } of fileMap) {
-      const fileArr = req.files?.[field];
-      const file = Array.isArray(fileArr) ? fileArr[0] : null;
-      if (!file) continue;
-
-      // Ensure slide exists
+    // Helper: ensure slide exists
+    const ensureSlide = (idx) => {
       while (slides.length <= idx) slides.push({ imageUrl: "", title: "", subtitle: "", link: "" });
+    };
 
-      const upload = await cloudinary.uploader.upload(file.path, {
-        folder: "homepage",
-      });
+    // First, handle explicit heroN fields
+    const explicit = [];
+    const implicit = [];
 
+    for (const f of heroFiles) {
+      const m = /^hero(\d+)$/.exec(f.fieldname);
+      if (m) explicit.push({ file: f, idx: Math.max(parseInt(m[1], 10) - 1, 0) });
+      else implicit.push(f);
+    }
+
+    // Upload explicit heroN
+    for (const { file, idx } of explicit) {
+      ensureSlide(idx);
+      const upload = await cloudinary.uploader.upload(file.path, { folder: "homepage" });
       slides[idx].imageUrl = upload.secure_url;
+      try {
+        fs.unlinkSync(file.path);
+      } catch {}
+    }
 
-      // Clean temp file
+    // Upload remaining files in order (heroImages etc.) -> slide 0,1,2...
+    for (let i = 0; i < implicit.length; i += 1) {
+      const file = implicit[i];
+      ensureSlide(i);
+      const upload = await cloudinary.uploader.upload(file.path, { folder: "homepage" });
+      slides[i].imageUrl = upload.secure_url;
       try {
         fs.unlinkSync(file.path);
       } catch {}
