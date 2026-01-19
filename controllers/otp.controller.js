@@ -146,7 +146,9 @@ exports.resendOtpController = async (req, res) => {
 ===================== */
 exports.verifyOtpController = async (req, res) => {
   try {
-    let { email, code, purpose } = req.body;
+    let { email, purpose } = req.body;
+    // Frontends commonly send "otp" instead of "code"
+    const code = String(req.body.code || req.body.otp || "").trim();
 
     if (!email || !code || !purpose || !VALID_PURPOSES.includes(purpose)) {
       return res.status(400).json({
@@ -191,7 +193,7 @@ exports.verifyOtpController = async (req, res) => {
        OTP VERIFIED
     ===================== */
 
-    if (purpose === "login" || purpose === "forgot") {
+    if (purpose === "login") {
       await Otp.deleteOne({ _id: otpEntry._id });
 
       const user = await User.findOne({ email }).select("-password");
@@ -207,17 +209,29 @@ exports.verifyOtpController = async (req, res) => {
 
       const responseData = {
         success: true,
-        message: "OTP verified successfully",
+        message: "Login successful",
+        token, // ✅ always return token (frontend may not rely on cookies)
         user: {
+          id: user._id,
           name: user.name,
           email: user.email,
           role: user.role,
         },
       };
 
-      if (!isProduction) responseData.token = token;
-
       return res.status(200).json(responseData);
+    }
+
+    // Forgot password OTP should only verify the OTP (do not log the user in)
+    if (purpose === "forgot") {
+      otpEntry.status = "verified";
+      await otpEntry.save();
+
+      return res.status(200).json({
+        success: true,
+        message: "OTP verified successfully",
+        purpose: "forgot",
+      });
     }
 
     /* =====================
