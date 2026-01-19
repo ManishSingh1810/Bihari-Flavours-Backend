@@ -14,6 +14,7 @@ const productRoutes = require("./routes/product.routes");
 const cartRoutes = require("./routes/cart.routes");
 const couponRoutes = require("./routes/coupon.routes");
 const orderRoutes = require("./routes/order.routes"); 
+const homepageRoutes = require("./routes/homepage.routes");
 const {razorpayWebhook} = require("./controllers/order.controller");
 const { logout } = require("./controllers/user.controller");
 
@@ -86,6 +87,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/coupons", couponRoutes);
+app.use("/api", homepageRoutes);
 
 // Base route
 app.get("/", (req, res) => {
