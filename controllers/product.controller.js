@@ -269,6 +269,8 @@ exports.addProductReview = async (req, res) => {
   try {
     const userId = req.user._id;
     const { rating, comment } = req.body;
+    const cityRaw = req.body?.city;
+    const city = typeof cityRaw === "string" ? cityRaw.trim() : "";
 
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({ success: false, message: "Rating must be 1 to 5" });
@@ -276,11 +278,15 @@ exports.addProductReview = async (req, res) => {
     if (!comment || !comment.trim()) {
       return res.status(400).json({ success: false, message: "Review comment is required" });
     }
+    if (city && city.length > 60) {
+      return res.status(400).json({ success: false, message: "City must be 60 characters or less" });
+    }
 
     const review = await Review.create({
       productId: req.params.id,
       userId,
       userName: req.user.name || "Customer",
+      city,
       rating,
       comment: comment.trim(),
     });
