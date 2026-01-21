@@ -95,11 +95,33 @@ exports.updateHomepage = async (req, res) => {
     for (let i = 0; i < implicit.length; i += 1) {
       const file = implicit[i];
       ensureSlide(i);
-      const upload = await cloudinary.uploader.upload(file.path, { folder: "homepage" });
-      slides[i].imageUrl = upload.secure_url;
+      let upload;
+      try {
+        upload = await cloudinary.uploader.upload(file.path, { folder: "homepage" });
+      } catch (e) {
+        console.error("Homepage image upload failed:", e?.message || e);
+        return res.status(500).json({
+          success: false,
+          message:
+            "Cloudinary upload failed. Check CLOUDINARY_* env vars on Render and file size/type.",
+          error: String(e?.message || e),
+        });
+      }
+
+      slides[i].imageUrl = upload?.secure_url || "";
       try {
         fs.unlinkSync(file.path);
       } catch {}
+    }
+
+    // If the client sent neither slides nor files, no-op is confusing.
+    const didSendSlides = incomingSlides !== null;
+    const didSendFiles = heroFiles.length > 0;
+    if (!didSendSlides && !didSendFiles) {
+      return res.status(400).json({
+        success: false,
+        message: "Nothing to update. Send heroSlides and/or hero image files.",
+      });
     }
 
     homepage.heroSlides = slides;
@@ -112,6 +134,7 @@ exports.updateHomepage = async (req, res) => {
       },
     });
   } catch (e) {
+    console.error("Homepage update failed:", e?.message || e);
     return res.status(500).json({ success: false, message: "Failed to update homepage" });
   }
 };
