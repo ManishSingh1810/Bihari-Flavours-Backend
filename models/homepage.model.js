@@ -15,6 +15,7 @@ const homepageSchema = new mongoose.Schema(
     // Singleton guard (only one doc should exist)
     key: { type: String, default: "default", unique: true, index: true },
     heroSlides: { type: [heroSlideSchema], default: [] },
+    storyImageUrl: { type: String, default: "" },
   },
   { timestamps: true }
 );

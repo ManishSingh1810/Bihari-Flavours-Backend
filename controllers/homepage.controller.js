@@ -28,6 +28,7 @@ exports.getHomepage = async (req, res) => {
       success: true,
       homepage: {
         heroSlides: normalizeSlides(homepage.heroSlides),
+        storyImageUrl: String(homepage.storyImageUrl || ""),
       },
     });
   } catch (e) {
@@ -66,6 +67,27 @@ exports.updateHomepage = async (req, res) => {
     const files = Array.isArray(req.files) ? req.files : [];
     const heroFiles = files.filter((f) => f && typeof f.fieldname === "string");
 
+    // 2a) Story image (single)
+    const storyFile = heroFiles.find((f) => f.fieldname === "storyImage");
+    if (storyFile) {
+      let upload;
+      try {
+        upload = await cloudinary.uploader.upload(storyFile.path, { folder: "homepage" });
+      } catch (e) {
+        console.error("Story image upload failed:", e?.message || e);
+        return res.status(500).json({
+          success: false,
+          message:
+            "Cloudinary upload failed for storyImage. Check CLOUDINARY_* env vars on Render and file size/type.",
+          error: String(e?.message || e),
+        });
+      }
+      homepage.storyImageUrl = upload?.secure_url || "";
+      try {
+        fs.unlinkSync(storyFile.path);
+      } catch {}
+    }
+
     // Helper: ensure slide exists
     const ensureSlide = (idx) => {
       while (slides.length <= idx) slides.push({ imageUrl: "", title: "", subtitle: "", link: "" });
@@ -76,6 +98,8 @@ exports.updateHomepage = async (req, res) => {
     const implicit = [];
 
     for (const f of heroFiles) {
+      // storyImage is handled separately above
+      if (f.fieldname === "storyImage") continue;
       const m = /^hero(\d+)$/.exec(f.fieldname);
       if (m) explicit.push({ file: f, idx: Math.max(parseInt(m[1], 10) - 1, 0) });
       else implicit.push(f);
@@ -131,6 +155,7 @@ exports.updateHomepage = async (req, res) => {
       success: true,
       homepage: {
         heroSlides: normalizeSlides(homepage.heroSlides),
+        storyImageUrl: String(homepage.storyImageUrl || ""),
       },
     });
   } catch (e) {
