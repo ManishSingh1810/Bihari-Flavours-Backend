@@ -19,6 +19,8 @@ exports.addToCart = async (req, res) => {
   try {
     const userId = req.user._id;
     const { productId } = req.body;
+    const variantLabelRaw = req.body?.variantLabel;
+    const variantLabel = typeof variantLabelRaw === "string" ? variantLabelRaw.trim() : "";
 
     if (!productId) {
       return res.status(400).json({
@@ -42,10 +44,37 @@ exports.addToCart = async (req, res) => {
       });
     }
 
-    if (product.quantity !== "instock") {
+    const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+    const defaultVariant = hasVariants
+      ? (product.variants.find((v) => v.isDefault) || product.variants[0])
+      : null;
+
+    const selectedVariant = hasVariants
+      ? (product.variants.find((v) => v.label === variantLabel) || (variantLabel ? null : defaultVariant))
+      : null;
+
+    if (hasVariants && !selectedVariant) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid variantLabel",
+      });
+    }
+
+    const effectiveVariantLabel = hasVariants ? String(selectedVariant.label) : "";
+    const unitPrice = hasVariants ? Number(selectedVariant.price) : Number(product.price);
+    const variantStock = hasVariants ? Number(selectedVariant.stock) : null;
+
+    if (!hasVariants && product.quantity !== "instock") {
       return res.status(400).json({
         success: false,
         message: "Product is out of stock"
+      });
+    }
+
+    if (hasVariants && (!Number.isFinite(variantStock) || variantStock <= 0)) {
+      return res.status(400).json({
+        success: false,
+        message: `Selected variant is out of stock`,
       });
     }
 
@@ -55,18 +84,30 @@ exports.addToCart = async (req, res) => {
 
     if (cart) {
       const index = cart.cartItems.findIndex(
-        item => item.productId.toString() === productId
+        item => item.productId.toString() === productId && String(item.variantLabel || "") === effectiveVariantLabel
       );
 
       if (index >= 0) {
+        // Stock check for variants
+        if (hasVariants) {
+          const nextQty = Number(cart.cartItems[index].quantity || 0) + 1;
+          if (nextQty > variantStock) {
+            return res.status(400).json({
+              success: false,
+              message: "Not enough stock for selected variant",
+            });
+          }
+        }
         cart.cartItems[index].quantity += 1;
       } else {
         cart.cartItems.push({
           productId,
+          variantLabel: effectiveVariantLabel,
           photo: mainImage,
           name: product.name,
           quantity: 1,
-          price: product.price
+          priceAtAdd: unitPrice,
+          price: unitPrice
         });
       }
     } else {
@@ -74,16 +115,18 @@ exports.addToCart = async (req, res) => {
         userId,
         cartItems: [{
           productId,
+          variantLabel: effectiveVariantLabel,
           photo: mainImage,
           name: product.name,
           quantity: 1,
-          price: product.price
+          priceAtAdd: unitPrice,
+          price: unitPrice
         }]
       });
     }
 
     cart.totalAmount = cart.cartItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
+      (sum, item) => sum + (Number(item.priceAtAdd ?? item.price) || 0) * (Number(item.quantity) || 0),
       0
     );
 
@@ -110,6 +153,8 @@ exports.updateCart = async (req, res) => {
   try {
     const userId = req.user._id;
     const { productId, quantity } = req.body; // Single product update
+    const variantLabelRaw = req.body?.variantLabel;
+    const variantLabel = typeof variantLabelRaw === "string" ? variantLabelRaw.trim() : "";
 
     if (!productId || quantity == null || quantity < 0) {
       return res.status(400).json({ success: false, message: "Invalid product or quantity" });
@@ -120,7 +165,9 @@ exports.updateCart = async (req, res) => {
       return res.status(404).json({ success: false, message: "Cart not found" });
     }
 
-    const productIndex = cart.cartItems.findIndex(item => item.productId.toString() === productId);
+    const productIndex = cart.cartItems.findIndex(
+      (item) => item.productId.toString() === productId && String(item.variantLabel || "") === variantLabel
+    );
 
     if (productIndex === -1) {
       return res.status(404).json({ success: false, message: "Product not in cart" });
@@ -136,12 +183,22 @@ exports.updateCart = async (req, res) => {
         return res.status(404).json({ success: false, message: "Product not found" });
       }
 
-      if (product.quantity !== "instock") {
+      const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+      if (hasVariants) {
+        if (!variantLabel) {
+          return res.status(400).json({ success: false, message: "variantLabel is required for variant products" });
+        }
+        const v = product.variants.find((x) => x.label === variantLabel);
+        if (!v) return res.status(400).json({ success: false, message: "Invalid variantLabel" });
+        if (Number(quantity) > Number(v.stock)) {
+          return res.status(400).json({ success: false, message: "Not enough stock for selected variant" });
+        }
+      } else if (product.quantity !== "instock") {
         return res.status(400).json({ success: false, message: `Product ${product.name} is out of stock` });
       }
 
       cart.cartItems[productIndex].quantity = quantity;
-      cart.cartItems[productIndex].price = product.price;
+      // Keep priceAtAdd stable (do not overwrite with current product price)
     }
 
     if (cart.cartItems.length === 0) {
@@ -153,7 +210,10 @@ exports.updateCart = async (req, res) => {
       });
     }
 
-    cart.totalAmount = cart.cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+    cart.totalAmount = cart.cartItems.reduce(
+      (acc, item) => acc + (Number(item.priceAtAdd ?? item.price) || 0) * (Number(item.quantity) || 0),
+      0
+    );
     await cart.save();
 
     res.status(200).json({

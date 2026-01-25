@@ -1,5 +1,16 @@
 const mongoose = require('mongoose');
 
+const variantSchema = new mongoose.Schema(
+  {
+    label: { type: String, required: true, trim: true },
+    price: { type: Number, required: true, min: 0 },
+    stock: { type: Number, default: 0, min: 0 },
+    isDefault: { type: Boolean, default: false },
+    sku: { type: String, default: "", trim: true },
+  },
+  { _id: false }
+);
+
 const productSchema = new mongoose.Schema({
 
   name: {
@@ -37,6 +48,13 @@ const productSchema = new mongoose.Schema({
     type: Number,
     required: [true, 'Product price is required'],
     min: [0, 'Price must be a positive number']
+  },
+
+  // ✅ Size variants (optional)
+  // Backward compatible: if missing/empty, use product.price + product.quantity (instock/outofstock)
+  variants: {
+    type: [variantSchema],
+    default: [],
   },
 
   quantity: {

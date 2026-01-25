@@ -3,12 +3,72 @@ const Product = require("../models/product.model");
 const cloudinary = require("../config/cloudinary");
 const fs = require("fs");
 
+/* =====================
+   VARIANTS HELPERS
+===================== */
+const parseVariants = (raw) => {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string" && raw.trim()) {
+    return JSON.parse(raw);
+  }
+  return null;
+};
+
+const normalizeVariants = (variantsRaw) => {
+  if (!Array.isArray(variantsRaw)) return [];
+
+  const out = variantsRaw.map((v) => ({
+    label: String(v?.label || "").trim(),
+    price: Number(v?.price),
+    stock: v?.stock == null ? 0 : Number(v.stock),
+    isDefault: Boolean(v?.isDefault),
+    sku: String(v?.sku || "").trim(),
+  }));
+
+  for (const v of out) {
+    if (!v.label) throw new Error("Variant label is required");
+    if (!Number.isFinite(v.price) || v.price < 0) throw new Error("Variant price must be >= 0");
+    if (!Number.isFinite(v.stock) || v.stock < 0) throw new Error("Variant stock must be >= 0");
+  }
+
+  // Unique labels
+  const labels = out.map((v) => v.label.toLowerCase());
+  if (new Set(labels).size !== labels.length) {
+    throw new Error("Variant labels must be unique");
+  }
+
+  // Ensure exactly one default
+  const defaultIdx = out.findIndex((v) => v.isDefault);
+  if (defaultIdx === -1 && out.length > 0) out[0].isDefault = true;
+  if (defaultIdx !== -1) {
+    out.forEach((v, i) => {
+      if (i !== defaultIdx) v.isDefault = false;
+    });
+  }
+
+  return out;
+};
+
+const getDefaultVariant = (variants) => {
+  if (!Array.isArray(variants) || variants.length === 0) return null;
+  return variants.find((v) => v.isDefault) || variants[0];
+};
+
 /* ======================================================
    ADD PRODUCT (MULTIPLE IMAGES)
 ====================================================== */
 exports.addProduct = async (req, res) => {
   try {
     const { name, desc, price, quantity, netQuantity, shelfLife, ingredients, storage, country } = req.body;
+
+    let variants = [];
+    try {
+      const parsed = parseVariants(req.body?.variants);
+      if (parsed) variants = normalizeVariants(parsed);
+    } catch (e) {
+      return res.status(400).json({ success: false, message: e.message || "Invalid variants" });
+    }
 
     /* ----------------------------
        VALIDATION
@@ -48,11 +108,21 @@ exports.addProduct = async (req, res) => {
     /* ----------------------------
        CREATE PRODUCT
     ---------------------------- */
+    const defaultVariant = getDefaultVariant(variants);
+    const fallbackPrice = defaultVariant ? defaultVariant.price : price;
+    const fallbackQuantity =
+      defaultVariant && variants.some((v) => (Number(v.stock) || 0) > 0)
+        ? "instock"
+        : defaultVariant
+          ? "outofstock"
+          : quantity;
+
     const newProduct = await Product.create({
       name: name.trim(),
       desc,
-      price,
-      quantity,
+      price: fallbackPrice,
+      quantity: fallbackQuantity,
+      variants,
       netQuantity,
       shelfLife,
       ingredients,
@@ -189,10 +259,29 @@ exports.updateProduct = async (req, res) => {
       product.photos.push(...newImages);
     }
 
+    // Variants (optional)
+    if (req.body?.variants != null) {
+      try {
+        const parsed = parseVariants(req.body.variants);
+        product.variants = normalizeVariants(parsed || []);
+
+        // Backward-compatible fallback fields
+        const def = getDefaultVariant(product.variants);
+        if (def) {
+          product.price = def.price;
+          product.quantity = product.variants.some((v) => (Number(v.stock) || 0) > 0) ? "instock" : "outofstock";
+        }
+      } catch (e) {
+        return res.status(400).json({ success: false, message: e.message || "Invalid variants" });
+      }
+    } else {
+      // Legacy fields
+      product.price = price ?? product.price;
+      product.quantity = quantity ?? product.quantity;
+    }
+
     product.name = name ?? product.name;
     product.desc = desc ?? product.desc;
-    product.price = price ?? product.price;
-    product.quantity = quantity ?? product.quantity;
     product.netQuantity = netQuantity ?? product.netQuantity;
     product.shelfLife = shelfLife ?? product.shelfLife;
     product.ingredients = ingredients ?? product.ingredients;

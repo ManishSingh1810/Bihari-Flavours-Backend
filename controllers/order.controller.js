@@ -7,6 +7,7 @@ const TransactionModel = require('../models/transaction.model');
 const OrderHistory = require('../models/orderhistory.model');
 const Coupon = require('../models/coupon.model');
 const Cart = require('../models/cart.model');
+const Product = require('../models/product.model');
 const razorpay = require('../config/razorpay');
 const { generateUniqueOrderCode } = require('../utils/orderCode');
 
@@ -25,6 +26,85 @@ const getOrderSortDate = (obj) => {
   const d = obj.completedAt || obj.createdAt;
   const ms = d ? new Date(d).getTime() : 0;
   return Number.isFinite(ms) ? ms : 0;
+};
+
+const getDefaultVariant = (product) => {
+  const vs = product?.variants;
+  if (!Array.isArray(vs) || vs.length === 0) return null;
+  return vs.find((v) => v.isDefault) || vs[0];
+};
+
+const buildValidatedItemsAndAdjustStock = async ({ items, session, decrementStock }) => {
+  const productMap = new Map(); // productId -> productDoc
+  const normalized = [];
+
+  for (const item of items) {
+    const productId = String(item?.productId || item?._id || "").trim();
+    const qty = Number(item?.quantity);
+    const variantLabel = typeof item?.variantLabel === "string" ? item.variantLabel.trim() : "";
+
+    if (!productId) throw new Error("productId is required");
+    if (!Number.isFinite(qty) || qty <= 0) throw new Error("Invalid quantity");
+
+    let product = productMap.get(productId);
+    if (!product) {
+      product = await Product.findById(productId).session(session);
+      if (!product) throw new Error("Product not found");
+      productMap.set(productId, product);
+    }
+
+    const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+    let selectedVariantLabel = "";
+    let unitPrice = Number(product.price);
+
+    if (hasVariants) {
+      const def = getDefaultVariant(product);
+      const v = product.variants.find((x) => x.label === variantLabel) || (variantLabel ? null : def);
+      if (!v) throw new Error("Invalid variantLabel");
+      if (!Number.isFinite(Number(v.stock))) throw new Error("Invalid variant stock");
+      if (decrementStock && Number(v.stock) < qty) throw new Error("Not enough stock for selected variant");
+
+      selectedVariantLabel = String(v.label);
+      unitPrice = Number(v.price);
+
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error("Invalid variant price");
+
+      if (decrementStock) {
+        v.stock = Number(v.stock) - qty;
+      }
+    } else {
+      if (product.quantity !== "instock") throw new Error("Product is out of stock");
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error("Invalid product price");
+      // No numeric stock tracking for legacy products
+    }
+
+    normalized.push({
+      productId: product._id,
+      name: product.name,
+      variantLabel: selectedVariantLabel,
+      priceAtAdd: unitPrice,
+      price: unitPrice,
+      quantity: qty,
+    });
+  }
+
+  // Persist stock updates (only for variant products)
+  if (decrementStock) {
+    for (const product of productMap.values()) {
+      const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+      if (!hasVariants) continue;
+
+      // Backward-compatible flags
+      const anyInStock = product.variants.some((v) => Number(v.stock) > 0);
+      product.quantity = anyInStock ? "instock" : "outofstock";
+      const def = getDefaultVariant(product);
+      if (def) product.price = Number(def.price);
+
+      await product.save({ session });
+    }
+  }
+
+  return normalized;
 };
 
 /* ======================================================
@@ -87,13 +167,17 @@ exports.createOrder = async (req, res) => {
       throw new Error('Cart is empty');
     }
 
+    // Validate items, compute pricing, and (for COD) decrement variant stock now
+    const validatedItems = await buildValidatedItemsAndAdjustStock({
+      items,
+      session,
+      decrementStock: paymentMethod === "COD",
+    });
+
     /* ----------------------------
        CALCULATE TOTAL
     ---------------------------- */
-    let totalAmount = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
+    let totalAmount = validatedItems.reduce((sum, item) => sum + item.priceAtAdd * item.quantity, 0);
 
     let coupon = null;
 
@@ -127,7 +211,7 @@ exports.createOrder = async (req, res) => {
 
       const [order] = await Order.create([{
         userId,
-        items,
+        items: validatedItems,
         shippingAddress,
         paymentMethod: 'COD',
         totalAmount,
@@ -160,7 +244,7 @@ exports.createOrder = async (req, res) => {
     // 1️⃣ Create TempOrder INSIDE transaction
     const [tempOrder] = await TempOrder.create([{
       userId,
-      items,
+      items: validatedItems,
       shippingAddress,
       paymentMethod: 'ONLINE',
       totalAmount,
@@ -233,10 +317,17 @@ exports.razorpayWebhook = async (req, res) => {
 
       if (!tempOrder) throw new Error('Temp order not found');
 
+      // Validate items again (source of truth) and decrement variant stock on successful payment
+      const validatedItems = await buildValidatedItemsAndAdjustStock({
+        items: tempOrder.items,
+        session,
+        decrementStock: true,
+      });
+
       const orderCode = await generateUniqueOrderCode({ Order, OrderHistory, session });
       const [order] = await Order.create([{
         userId: tempOrder.userId,
-        items: tempOrder.items,
+        items: validatedItems,
         shippingAddress: tempOrder.shippingAddress,
         paymentMethod: 'ONLINE',
         totalAmount: tempOrder.totalAmount,

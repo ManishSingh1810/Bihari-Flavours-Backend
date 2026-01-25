@@ -17,6 +17,14 @@ const orderItemSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
+  priceAtAdd: {
+    type: Number,
+    required: true
+  },
+  variantLabel: {
+    type: String,
+    default: ""
+  },
   quantity: {
     type: Number,
     required: true,

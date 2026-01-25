@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Order = require("../models/order.model");
 const OrderHistory = require("../models/orderhistory.model");
 const Coupon = require("../models/coupon.model");
+const Product = require("../models/product.model");
 
 // ----------------------------
 // Helper: Clean order object
@@ -109,6 +110,29 @@ exports.updateOrderStatus = async (req, res) => {
        MOVE TO HISTORY
     ===================== */
     if (orderStatus === "Delivered" || orderStatus === "Cancelled") {
+      // If cancelled, restore variant stock (best-effort; legacy products have no numeric stock)
+      if (orderStatus === "Cancelled") {
+        for (const item of order.items || []) {
+          const productId = item.productId;
+          const variantLabel = String(item.variantLabel || "").trim();
+          const qty = Number(item.quantity) || 0;
+          if (!qty) continue;
+
+          const product = await Product.findById(productId).session(session);
+          if (!product) continue;
+
+          const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+          if (hasVariants && variantLabel) {
+            const v = product.variants.find((x) => x.label === variantLabel);
+            if (v) v.stock = Number(v.stock || 0) + qty;
+            product.quantity = product.variants.some((x) => Number(x.stock) > 0) ? "instock" : "outofstock";
+            const def = product.variants.find((x) => x.isDefault) || product.variants[0];
+            if (def) product.price = Number(def.price);
+            await product.save({ session });
+          }
+        }
+      }
+
       const exists = await OrderHistory.findOne({
         originalOrderId: order._id,
       }).session(session);

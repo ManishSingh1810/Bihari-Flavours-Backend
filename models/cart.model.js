@@ -6,6 +6,7 @@ const cartItemSchema = new mongoose.Schema({
     ref: 'Product', // links to Product model
     required: true
   },
+  variantLabel: { type: String, default: "" },
   photo: {
     type: String,
     required: [true, 'Product image URL is required'],
@@ -20,6 +21,11 @@ const cartItemSchema = new mongoose.Schema({
     required: true,
     min: 1,
     default: 1
+  },
+  // Unit price stored at time of adding to cart (variant-aware)
+  priceAtAdd: {
+    type: Number,
+    required: true
   },
   price: {
     type: Number,

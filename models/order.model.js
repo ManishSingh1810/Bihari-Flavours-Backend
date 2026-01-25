@@ -7,6 +7,8 @@ const User = require("./user.model");
 const orderItemSchema = new mongoose.Schema({
   productId: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
   name: { type: String, required: true },
+  variantLabel: { type: String, default: "" },
+  priceAtAdd: { type: Number, required: true },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true, min: 1 },
 });
