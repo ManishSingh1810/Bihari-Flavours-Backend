@@ -151,8 +151,21 @@ const computeComboMeta = async (productDoc) => {
       ? Math.max(sum - (Number(obj.comboDiscount) || 0), 0)
       : (Number.isFinite(basePrice) ? basePrice : Number(obj.price) || 0);
 
+  // ✅ Backward-compatible response shape:
+  // If comboItems.product was populated into an object, convert it back to just the id.
+  // (Some frontends accidentally render comboItems.product directly and crash if it's an object.)
+  const safeComboItems = comboItems.map((ci) => {
+    const p = ci?.product;
+    const id = p && typeof p === "object" ? (p._id || p) : p;
+    return {
+      ...ci,
+      product: id,
+    };
+  });
+
   return {
     ...obj,
+    comboItems: safeComboItems,
     computedComboPrice,
     computedComboInStock: inStock,
   };
