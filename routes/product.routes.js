@@ -11,7 +11,8 @@ const {
   updateProduct,
   deleteProduct,
   getProductReviews,
-  addProductReview
+  addProductReview,
+  bulkUpdateDisplayOrder
 
 } = require("../controllers/product.controller");
 
@@ -26,6 +27,9 @@ router.post("/:id/reviews", protect, addProductReview);
 /* =====================
    ADMIN ROUTES
 ===================== */
+// Bulk reorder (drag/drop save)
+router.put("/admin/display-order", adminProtect, bulkUpdateDisplayOrder);
+
 router.post(
   "/",
   adminProtect,

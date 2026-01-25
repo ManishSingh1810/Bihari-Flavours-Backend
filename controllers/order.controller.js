@@ -34,9 +34,69 @@ const getDefaultVariant = (product) => {
   return vs.find((v) => v.isDefault) || vs[0];
 };
 
+const getProductEffectiveUnitPrice = (product, variantLabel) => {
+  const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
+  if (!hasVariants) return Number(product.price) || 0;
+  const def = getDefaultVariant(product);
+  const v = product.variants.find((x) => x.label === variantLabel) || (variantLabel ? null : def);
+  if (!v) throw new Error("Invalid variantLabel");
+  return Number(v.price) || 0;
+};
+
+const computeComboPriceAndCollectAdjustments = async ({ comboProduct, cartQty, session, adjustments }) => {
+  const comboItems = Array.isArray(comboProduct.comboItems) ? comboProduct.comboItems : [];
+  if (comboItems.length === 0) throw new Error("Combo has no items");
+
+  let sum = 0;
+
+  for (const ci of comboItems) {
+    const child = await Product.findById(ci.product).session(session);
+    if (!child) throw new Error("Combo item product not found");
+    if (String(child._id) === String(comboProduct._id)) throw new Error("Combo cannot include itself");
+
+    const needed = (Number(ci.quantity) || 0) * cartQty;
+    if (needed < 1) throw new Error("Invalid combo item quantity");
+
+    const childHasVariants = Array.isArray(child.variants) && child.variants.length > 0;
+    const label = typeof ci.variantLabel === "string" ? ci.variantLabel.trim() : "";
+
+    if (childHasVariants) {
+      const def = getDefaultVariant(child);
+      const v = child.variants.find((x) => x.label === label) || (label ? null : def);
+      if (!v) throw new Error("Invalid combo item variantLabel");
+      sum += (Number(v.price) || 0) * needed;
+
+      // record stock decrement for successful checkout
+      const key = `${child._id}:${String(v.label)}`;
+      adjustments.set(key, (adjustments.get(key) || 0) + needed);
+    } else {
+      if (child.quantity !== "instock") throw new Error("Combo item is out of stock");
+      sum += (Number(child.price) || 0) * needed;
+      // no numeric stock tracking for legacy items
+    }
+  }
+
+  if (comboProduct.comboPriceMode === "sumMinusDiscount") {
+    return Math.max(sum - (Number(comboProduct.comboDiscount) || 0), 0);
+  }
+
+  // fixed price combo: take combo product's effective price (variant-aware if it has variants)
+  return getProductEffectiveUnitPrice(comboProduct, "");
+};
+
 const buildValidatedItemsAndAdjustStock = async ({ items, session, decrementStock }) => {
-  const productMap = new Map(); // productId -> productDoc
+  const productCache = new Map(); // productId -> productDoc
+  const adjustments = new Map(); // `${productId}:${variantLabel}` -> qty to decrement
   const normalized = [];
+
+  const getProduct = async (id) => {
+    const key = String(id);
+    if (productCache.has(key)) return productCache.get(key);
+    const p = await Product.findById(key).session(session);
+    if (!p) throw new Error("Product not found");
+    productCache.set(key, p);
+    return p;
+  };
 
   for (const item of items) {
     const productId = String(item?.productId || item?._id || "").trim();
@@ -46,13 +106,29 @@ const buildValidatedItemsAndAdjustStock = async ({ items, session, decrementStoc
     if (!productId) throw new Error("productId is required");
     if (!Number.isFinite(qty) || qty <= 0) throw new Error("Invalid quantity");
 
-    let product = productMap.get(productId);
-    if (!product) {
-      product = await Product.findById(productId).session(session);
-      if (!product) throw new Error("Product not found");
-      productMap.set(productId, product);
+    const product = await getProduct(productId);
+
+    if (product.productType === "combo") {
+      // Validate combo availability and compute price
+      const computedComboUnitPrice = await computeComboPriceAndCollectAdjustments({
+        comboProduct: product,
+        cartQty: qty,
+        session,
+        adjustments,
+      });
+
+      normalized.push({
+        productId: product._id,
+        name: product.name,
+        variantLabel: "",
+        priceAtAdd: computedComboUnitPrice,
+        price: computedComboUnitPrice,
+        quantity: qty,
+      });
+      continue;
     }
 
+    // Single product logic (variant-aware)
     const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
     let selectedVariantLabel = "";
     let unitPrice = Number(product.price);
@@ -62,20 +138,17 @@ const buildValidatedItemsAndAdjustStock = async ({ items, session, decrementStoc
       const v = product.variants.find((x) => x.label === variantLabel) || (variantLabel ? null : def);
       if (!v) throw new Error("Invalid variantLabel");
       if (!Number.isFinite(Number(v.stock))) throw new Error("Invalid variant stock");
-      if (decrementStock && Number(v.stock) < qty) throw new Error("Not enough stock for selected variant");
+      if (Number(v.stock) < qty) throw new Error("Not enough stock for selected variant");
 
       selectedVariantLabel = String(v.label);
       unitPrice = Number(v.price);
-
       if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error("Invalid variant price");
 
-      if (decrementStock) {
-        v.stock = Number(v.stock) - qty;
-      }
+      const key = `${product._id}:${selectedVariantLabel}`;
+      adjustments.set(key, (adjustments.get(key) || 0) + qty);
     } else {
       if (product.quantity !== "instock") throw new Error("Product is out of stock");
       if (!Number.isFinite(unitPrice) || unitPrice < 0) throw new Error("Invalid product price");
-      // No numeric stock tracking for legacy products
     }
 
     normalized.push({
@@ -88,18 +161,18 @@ const buildValidatedItemsAndAdjustStock = async ({ items, session, decrementStoc
     });
   }
 
-  // Persist stock updates (only for variant products)
+  // Apply stock adjustments only when requested (COD creation / ONLINE payment success)
   if (decrementStock) {
-    for (const product of productMap.values()) {
-      const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
-      if (!hasVariants) continue;
-
-      // Backward-compatible flags
-      const anyInStock = product.variants.some((v) => Number(v.stock) > 0);
-      product.quantity = anyInStock ? "instock" : "outofstock";
+    for (const [key, decQty] of adjustments.entries()) {
+      const [productId, variantLabel] = key.split(":");
+      const product = await getProduct(productId);
+      const v = (product.variants || []).find((x) => x.label === variantLabel);
+      if (!v) throw new Error("Variant not found for stock decrement");
+      if (Number(v.stock) < decQty) throw new Error("Not enough stock");
+      v.stock = Number(v.stock) - decQty;
+      product.quantity = product.variants.some((x) => Number(x.stock) > 0) ? "instock" : "outofstock";
       const def = getDefaultVariant(product);
       if (def) product.price = Number(def.price);
-
       await product.save({ session });
     }
   }

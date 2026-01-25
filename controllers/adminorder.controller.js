@@ -121,6 +121,31 @@ exports.updateOrderStatus = async (req, res) => {
           const product = await Product.findById(productId).session(session);
           if (!product) continue;
 
+          // Combo cancel: restore underlying component stock
+          if (product.productType === "combo") {
+            const comboItems = Array.isArray(product.comboItems) ? product.comboItems : [];
+            for (const ci of comboItems) {
+              const child = await Product.findById(ci.product).session(session);
+              if (!child) continue;
+              const childHasVariants = Array.isArray(child.variants) && child.variants.length > 0;
+              const needed = (Number(ci.quantity) || 0) * qty;
+              if (needed <= 0) continue;
+
+              if (childHasVariants) {
+                const label = String(ci.variantLabel || "").trim();
+                const def = child.variants.find((x) => x.isDefault) || child.variants[0];
+                const v = child.variants.find((x) => x.label === label) || (label ? null : def);
+                if (!v) continue;
+                v.stock = Number(v.stock || 0) + needed;
+                child.quantity = child.variants.some((x) => Number(x.stock) > 0) ? "instock" : "outofstock";
+                const childDef = child.variants.find((x) => x.isDefault) || child.variants[0];
+                if (childDef) child.price = Number(childDef.price);
+                await child.save({ session });
+              }
+            }
+            continue;
+          }
+
           const hasVariants = Array.isArray(product.variants) && product.variants.length > 0;
           if (hasVariants && variantLabel) {
             const v = product.variants.find((x) => x.label === variantLabel);

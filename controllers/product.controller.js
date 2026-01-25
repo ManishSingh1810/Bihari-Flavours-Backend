@@ -55,12 +55,132 @@ const getDefaultVariant = (variants) => {
   return variants.find((v) => v.isDefault) || variants[0];
 };
 
+/* =====================
+   COMBOS HELPERS
+===================== */
+const parseComboItems = (raw) => {
+  if (raw == null) return null;
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string" && raw.trim()) return JSON.parse(raw);
+  return null;
+};
+
+const normalizeCombo = ({ productId, productType, comboItemsRaw, comboPriceMode, comboDiscount, showInCombosSection }) => {
+  const pt = productType === "combo" ? "combo" : "single";
+  const mode = comboPriceMode === "sumMinusDiscount" ? "sumMinusDiscount" : "fixed";
+  const discount = comboDiscount == null ? 0 : Number(comboDiscount);
+  const show = Boolean(showInCombosSection);
+
+  let comboItems = [];
+  if (pt === "combo") {
+    if (!Array.isArray(comboItemsRaw) || comboItemsRaw.length === 0) {
+      throw new Error("comboItems must be a non-empty array for combo products");
+    }
+    comboItems = comboItemsRaw.map((ci) => ({
+      product: String(ci?.product || "").trim(),
+      variantLabel: typeof ci?.variantLabel === "string" ? ci.variantLabel.trim() : "",
+      quantity: Number(ci?.quantity),
+    }));
+
+    for (const ci of comboItems) {
+      if (!ci.product) throw new Error("comboItems.product is required");
+      if (!Number.isFinite(ci.quantity) || ci.quantity < 1) throw new Error("comboItems.quantity must be >= 1");
+      if (productId && String(ci.product) === String(productId)) throw new Error("Combo cannot include itself");
+    }
+  }
+
+  if (!Number.isFinite(discount) || discount < 0) throw new Error("comboDiscount must be >= 0");
+
+  return { productType: pt, comboItems, comboPriceMode: mode, comboDiscount: discount, showInCombosSection: show };
+};
+
+const computeComboMeta = async (productDoc) => {
+  const obj = productDoc.toObject ? productDoc.toObject() : productDoc;
+
+  const hasVariants = Array.isArray(obj.variants) && obj.variants.length > 0;
+  const defaultVariant = hasVariants ? (obj.variants.find((v) => v.isDefault) || obj.variants[0]) : null;
+
+  // Base price when comboPriceMode=fixed OR for single products
+  const basePrice = defaultVariant ? Number(defaultVariant.price) : Number(obj.price);
+
+  // Single product: computedComboPrice is just its effective display price
+  if (obj.productType !== "combo") {
+    return {
+      ...obj,
+      computedComboPrice: Number.isFinite(basePrice) ? basePrice : Number(obj.price) || 0,
+      computedComboInStock: obj.quantity === "instock",
+    };
+  }
+
+  // Combo: compute in-stock and computed price
+  const comboItems = Array.isArray(obj.comboItems) ? obj.comboItems : [];
+  let sum = 0;
+  let inStock = true;
+
+  for (const ci of comboItems) {
+    const p = ci.product && ci.product._id ? ci.product : null; // populated
+    if (!p) {
+      inStock = false;
+      continue;
+    }
+
+    const pHasVariants = Array.isArray(p.variants) && p.variants.length > 0;
+    const pDef = pHasVariants ? (p.variants.find((v) => v.isDefault) || p.variants[0]) : null;
+    const chosen =
+      pHasVariants
+        ? (p.variants.find((v) => v.label === (ci.variantLabel || "")) || (ci.variantLabel ? null : pDef))
+        : null;
+
+    if (pHasVariants) {
+      if (!chosen) {
+        inStock = false;
+        continue;
+      }
+      const needed = Number(ci.quantity) || 0;
+      const avail = Number(chosen.stock) || 0;
+      if (avail < needed) inStock = false;
+      sum += (Number(chosen.price) || 0) * needed;
+    } else {
+      if (p.quantity !== "instock") inStock = false;
+      sum += (Number(p.price) || 0) * (Number(ci.quantity) || 0);
+    }
+  }
+
+  const computedComboPrice =
+    obj.comboPriceMode === "sumMinusDiscount"
+      ? Math.max(sum - (Number(obj.comboDiscount) || 0), 0)
+      : (Number.isFinite(basePrice) ? basePrice : Number(obj.price) || 0);
+
+  return {
+    ...obj,
+    computedComboPrice,
+    computedComboInStock: inStock,
+  };
+};
+
 /* ======================================================
    ADD PRODUCT (MULTIPLE IMAGES)
 ====================================================== */
 exports.addProduct = async (req, res) => {
   try {
     const { name, desc, price, quantity, netQuantity, shelfLife, ingredients, storage, country } = req.body;
+    const displayOrder = req.body?.displayOrder == null ? undefined : Number(req.body.displayOrder);
+
+    // Combos
+    let comboNormalized = { productType: "single", comboItems: [], comboPriceMode: "fixed", comboDiscount: 0, showInCombosSection: false };
+    try {
+      const comboItemsParsed = parseComboItems(req.body?.comboItems);
+      comboNormalized = normalizeCombo({
+        productId: null,
+        productType: req.body?.productType,
+        comboItemsRaw: comboItemsParsed,
+        comboPriceMode: req.body?.comboPriceMode,
+        comboDiscount: req.body?.comboDiscount,
+        showInCombosSection: req.body?.showInCombosSection,
+      });
+    } catch (e) {
+      return res.status(400).json({ success: false, message: e.message || "Invalid combo config" });
+    }
 
     let variants = [];
     try {
@@ -123,6 +243,8 @@ exports.addProduct = async (req, res) => {
       price: fallbackPrice,
       quantity: fallbackQuantity,
       variants,
+      displayOrder: Number.isFinite(displayOrder) ? displayOrder : undefined,
+      ...comboNormalized,
       netQuantity,
       shelfLife,
       ingredients,
@@ -158,9 +280,16 @@ exports.getProducts = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 24, 1), 100);
     const sortRaw = String(req.query.sort || "newest");
     const inStockOnly = String(req.query.inStock || req.query.instock || "").toLowerCase() === "true";
+    const productType = String(req.query.productType || "").trim();
+    const showInCombosSection =
+      String(req.query.showInCombosSection || "").toLowerCase() === "true";
+    const onlyCombos = String(req.query.onlyCombos || "").toLowerCase() === "true";
 
     const filter = {};
     if (inStockOnly) filter.quantity = "instock";
+    if (productType === "combo" || productType === "single") filter.productType = productType;
+    if (showInCombosSection) filter.showInCombosSection = true;
+    if (onlyCombos) filter.productType = "combo";
     if (q) {
       // For small catalogs this is fine; if you grow, add text indexes / Atlas Search later.
       const rx = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -168,15 +297,19 @@ exports.getProducts = async (req, res) => {
     }
 
     const sort = (() => {
+      // Default: manual ordering
+      if (!req.query.sort) return { displayOrder: 1, createdAt: -1 };
       if (sortRaw === "price_asc") return { price: 1 };
       if (sortRaw === "price_desc") return { price: -1 };
       if (sortRaw === "oldest") return { createdAt: 1 };
+      if (sortRaw === "displayOrder_asc") return { displayOrder: 1, createdAt: -1 };
       return { createdAt: -1 }; // newest
     })();
 
     const [total, products] = await Promise.all([
       Product.countDocuments(filter),
       Product.find(filter)
+        .populate("comboItems.product")
         .sort(sort)
         .skip((page - 1) * limit)
         .limit(limit),
@@ -188,7 +321,7 @@ exports.getProducts = async (req, res) => {
       total,
       page,
       pages: Math.ceil(total / limit) || 1,
-      products
+      products: await Promise.all(products.map(computeComboMeta))
     });
   } catch (error) {
     res.status(500).json({
@@ -203,7 +336,7 @@ exports.getProducts = async (req, res) => {
 ====================================================== */
 exports.getProductById = async (req, res) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findById(req.params.id).populate("comboItems.product");
     if (!product) {
       return res.status(404).json({
         success: false,
@@ -213,7 +346,7 @@ exports.getProductById = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      product
+      product: await computeComboMeta(product)
     });
 
   } catch (error) {
@@ -230,6 +363,7 @@ exports.getProductById = async (req, res) => {
 exports.updateProduct = async (req, res) => {
   try {
     const { name, desc, price, quantity, netQuantity, shelfLife, ingredients, storage, country } = req.body;
+    const displayOrder = req.body?.displayOrder == null ? undefined : Number(req.body.displayOrder);
 
     const product = await Product.findById(req.params.id);
     if (!product) {
@@ -280,6 +414,37 @@ exports.updateProduct = async (req, res) => {
       product.quantity = quantity ?? product.quantity;
     }
 
+    // Combo fields (optional)
+    if (
+      req.body?.productType != null ||
+      req.body?.comboItems != null ||
+      req.body?.comboPriceMode != null ||
+      req.body?.comboDiscount != null ||
+      req.body?.showInCombosSection != null
+    ) {
+      try {
+        const comboItemsParsed = parseComboItems(req.body?.comboItems);
+        const normalized = normalizeCombo({
+          productId: product._id,
+          productType: req.body?.productType ?? product.productType,
+          comboItemsRaw: comboItemsParsed ?? product.comboItems,
+          comboPriceMode: req.body?.comboPriceMode ?? product.comboPriceMode,
+          comboDiscount: req.body?.comboDiscount ?? product.comboDiscount,
+          showInCombosSection: req.body?.showInCombosSection ?? product.showInCombosSection,
+        });
+
+        product.productType = normalized.productType;
+        product.comboItems = normalized.comboItems;
+        product.comboPriceMode = normalized.comboPriceMode;
+        product.comboDiscount = normalized.comboDiscount;
+        product.showInCombosSection = normalized.showInCombosSection;
+      } catch (e) {
+        return res.status(400).json({ success: false, message: e.message || "Invalid combo config" });
+      }
+    }
+
+    if (Number.isFinite(displayOrder)) product.displayOrder = displayOrder;
+
     product.name = name ?? product.name;
     product.desc = desc ?? product.desc;
     product.netQuantity = netQuantity ?? product.netQuantity;
@@ -294,7 +459,7 @@ exports.updateProduct = async (req, res) => {
     res.status(200).json({
       success: true,
       message: "Product updated successfully",
-      product
+      product: await computeComboMeta(product)
     });
 
   } catch (error) {
@@ -389,6 +554,49 @@ exports.addProductReview = async (req, res) => {
       });
     }
     res.status(500).json({ success: false, message: "Failed to submit review" });
+  }
+};
+
+/* ======================================================
+   BULK UPDATE DISPLAY ORDER (ADMIN)
+   PUT /api/products/admin/display-order
+   body: { orders: [{ productId, displayOrder }] }
+====================================================== */
+exports.bulkUpdateDisplayOrder = async (req, res) => {
+  try {
+    const orders = Array.isArray(req.body?.orders) ? req.body.orders : null;
+    if (!orders || orders.length === 0) {
+      return res.status(400).json({ success: false, message: "orders[] is required" });
+    }
+
+    const ops = [];
+    for (const row of orders) {
+      const productId = String(row?.productId || "").trim();
+      const displayOrder = Number(row?.displayOrder);
+      if (!productId) {
+        return res.status(400).json({ success: false, message: "productId is required for each order row" });
+      }
+      if (!Number.isFinite(displayOrder)) {
+        return res.status(400).json({ success: false, message: "displayOrder must be a number for each order row" });
+      }
+      ops.push({
+        updateOne: {
+          filter: { _id: productId },
+          update: { $set: { displayOrder } },
+        },
+      });
+    }
+
+    const result = await Product.bulkWrite(ops, { ordered: false });
+
+    return res.status(200).json({
+      success: true,
+      message: "Display order updated",
+      result,
+    });
+  } catch (e) {
+    console.error("bulkUpdateDisplayOrder error:", e);
+    return res.status(500).json({ success: false, message: "Failed to update display order" });
   }
 };
 

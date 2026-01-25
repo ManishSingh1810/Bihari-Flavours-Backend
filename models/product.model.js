@@ -11,6 +11,15 @@ const variantSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const comboItemSchema = new mongoose.Schema(
+  {
+    product: { type: mongoose.Schema.Types.ObjectId, ref: "Product", required: true },
+    variantLabel: { type: String, default: "", trim: true },
+    quantity: { type: Number, required: true, min: 1 },
+  },
+  { _id: false }
+);
+
 const productSchema = new mongoose.Schema({
 
   name: {
@@ -49,6 +58,16 @@ const productSchema = new mongoose.Schema({
     required: [true, 'Product price is required'],
     min: [0, 'Price must be a positive number']
   },
+
+  // Manual ordering (lower comes first)
+  displayOrder: { type: Number, default: 9999 },
+
+  // Combos/Packs
+  productType: { type: String, enum: ["single", "combo"], default: "single" },
+  comboItems: { type: [comboItemSchema], default: [] },
+  comboPriceMode: { type: String, enum: ["fixed", "sumMinusDiscount"], default: "fixed" },
+  comboDiscount: { type: Number, default: 0, min: 0 },
+  showInCombosSection: { type: Boolean, default: false },
 
   // ✅ Size variants (optional)
   // Backward compatible: if missing/empty, use product.price + product.quantity (instock/outofstock)
