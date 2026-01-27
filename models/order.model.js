@@ -1,6 +1,6 @@
 
 const mongoose = require("mongoose");
-const { sendOrderStatusEmail } = require("../utils/mail.service");
+const { sendOrderStatusEmail, sendAdminNewOrderEmail } = require("../utils/mail.service");
 const User = require("./user.model");
 
 /* ---------------- SUB SCHEMA ---------------- */
@@ -96,6 +96,19 @@ orderSchema.post("save", async function (doc) {
       amount: doc.totalAmount,
       status: "Placed",
     });
+
+    // ✅ Admin notification (support inbox)
+    try {
+      await sendAdminNewOrderEmail({
+        orderId: doc.orderCode || doc._id,
+        amount: doc.totalAmount,
+        paymentMethod: doc.paymentMethod,
+        customerName: doc.shippingAddress?.name || user.name || "Customer",
+        customerPhone: doc.shippingAddress?.phone || "",
+      });
+    } catch (e) {
+      console.error("Admin new order email error:", e?.message || e);
+    }
   } catch (err) {
     console.error("Order create email error:", err);
   }

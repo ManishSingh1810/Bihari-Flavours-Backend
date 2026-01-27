@@ -305,10 +305,68 @@ const sendOrderStatusEmail = async ({ email, orderId, amount, status }) => {
   };
 };
 
+/* ----------- SEND ADMIN ORDER NOTIFICATION ----------- */
+const sendAdminNewOrderEmail = async ({ orderId, amount, paymentMethod, customerName, customerPhone }) => {
+  const adminEmail = BRAND.supportEmail;
+  if (!adminEmail) throw new Error("Admin email is not configured");
+
+  const html = `
+  <div style="background:#ffffff;font-family:Arial,Helvetica,sans-serif;color:#1F1B16;max-width:600px;margin:0 auto;padding:32px;">
+    <h1 style="margin:0 0 12px 0;font-size:22px;font-weight:700;color:#8E1B1B;">
+      New Order Received
+    </h1>
+
+    <p style="margin:0 0 18px 0;font-size:14px;color:#6F675E;">
+      A new order has been placed on <strong>Bihari Flavours</strong>.
+    </p>
+
+    <div style="border-top:1px solid #eee;margin:20px 0;"></div>
+
+    <table width="100%" style="font-size:14px;border-collapse:collapse;">
+      <tr>
+        <td style="padding:6px 0;color:#6F675E;">Order ID</td>
+        <td style="padding:6px 0;text-align:right;font-weight:700;">${orderId}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#6F675E;">Amount</td>
+        <td style="padding:6px 0;text-align:right;font-weight:700;">₹${amount}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#6F675E;">Payment</td>
+        <td style="padding:6px 0;text-align:right;font-weight:700;">${paymentMethod}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#6F675E;">Customer</td>
+        <td style="padding:6px 0;text-align:right;font-weight:700;">${customerName || "Customer"}</td>
+      </tr>
+      <tr>
+        <td style="padding:6px 0;color:#6F675E;">Phone</td>
+        <td style="padding:6px 0;text-align:right;font-weight:700;">${customerPhone || "-"}</td>
+      </tr>
+    </table>
+
+    <div style="border-top:1px solid #eee;margin:20px 0;"></div>
+
+    <p style="margin:0;font-size:13px;color:#6F675E;">
+      Please check the Admin Panel for full details and processing.
+    </p>
+  </div>
+  `;
+
+  await sendEmail({
+    to: adminEmail,
+    subject: `Bihari Flavours | New Order (${orderId})`,
+    html,
+  });
+
+  return { success: true, email: adminEmail, orderId };
+};
+
 
 module.exports = {
   sendOtpEmail,
   sendOrderStatusEmail,
+  sendAdminNewOrderEmail,
 };
 
 
