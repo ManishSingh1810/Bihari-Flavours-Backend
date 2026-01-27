@@ -86,6 +86,8 @@ app.use("/api/otp", otpRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
+// Alias (some frontends call /cart instead of /api/cart)
+app.use("/cart", cartRoutes);
 app.use("/api/coupons", couponRoutes);
 app.use("/api", homepageRoutes);
 

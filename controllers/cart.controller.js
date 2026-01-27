@@ -21,6 +21,15 @@ exports.addToCart = async (req, res) => {
     const { productId } = req.body;
     const variantLabelRaw = req.body?.variantLabel;
     const variantLabel = typeof variantLabelRaw === "string" ? variantLabelRaw.trim() : "";
+    const qtyToAddRaw = req.body?.quantity;
+    const qtyToAdd = qtyToAddRaw == null ? 1 : Number(qtyToAddRaw);
+
+    if (!Number.isFinite(qtyToAdd) || qtyToAdd < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Quantity must be >= 1",
+      });
+    }
 
     if (!productId) {
       return res.status(400).json({
@@ -90,7 +99,7 @@ exports.addToCart = async (req, res) => {
       if (index >= 0) {
         // Stock check for variants
         if (hasVariants) {
-          const nextQty = Number(cart.cartItems[index].quantity || 0) + 1;
+          const nextQty = Number(cart.cartItems[index].quantity || 0) + qtyToAdd;
           if (nextQty > variantStock) {
             return res.status(400).json({
               success: false,
@@ -98,14 +107,14 @@ exports.addToCart = async (req, res) => {
             });
           }
         }
-        cart.cartItems[index].quantity += 1;
+        cart.cartItems[index].quantity += qtyToAdd;
       } else {
         cart.cartItems.push({
           productId,
           variantLabel: effectiveVariantLabel,
           photo: mainImage,
           name: product.name,
-          quantity: 1,
+          quantity: qtyToAdd,
           priceAtAdd: unitPrice,
           price: unitPrice
         });
@@ -118,7 +127,7 @@ exports.addToCart = async (req, res) => {
           variantLabel: effectiveVariantLabel,
           photo: mainImage,
           name: product.name,
-          quantity: 1,
+          quantity: qtyToAdd,
           priceAtAdd: unitPrice,
           price: unitPrice
         }]
